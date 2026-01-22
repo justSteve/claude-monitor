@@ -21,7 +21,9 @@ class LogService {
     constructor() {
         this.logDir = config.logDir;
         this.logLevel = LOG_LEVELS[config.logLevel.toUpperCase()] ?? LOG_LEVELS.INFO;
-        this.eventSource = 'ClaudeMonitor';
+        // Validate eventSource contains only alphanumeric characters (defense-in-depth)
+        const rawEventSource = 'ClaudeMonitor';
+        this.eventSource = /^[a-zA-Z0-9_-]+$/.test(rawEventSource) ? rawEventSource : 'ClaudeMonitor';
         this.maxLogFiles = 7; // Keep 7 days of logs
         this.currentLogFile = null;
         this.currentLogDate = null;
@@ -82,7 +84,17 @@ class LogService {
      * @param {string} entryType - 'Information', 'Warning', or 'Error'
      */
     _writeToEventLog(message, entryType = 'Information') {
-        // Use PowerShell to write to Event Log
+        // Validate entryType to prevent injection
+        const validEntryTypes = ['Information', 'Warning', 'Error'];
+        if (!validEntryTypes.includes(entryType)) {
+            entryType = 'Information';
+        }
+
+        // Encode message as Base64 to avoid command injection vulnerabilities
+        // Direct string interpolation is unsafe even with quote escaping due to
+        // PowerShell metacharacters like $(), backticks, and newlines
+        const messageBase64 = Buffer.from(String(message), 'utf8').toString('base64');
+
         const script = `
             $source = '${this.eventSource}'
             if (-not [System.Diagnostics.EventLog]::SourceExists($source)) {
@@ -93,7 +105,9 @@ class LogService {
                 }
             }
             try {
-                Write-EventLog -LogName Application -Source $source -EntryType ${entryType} -EventId 1000 -Message '${message.replace(/'/g, "''")}'
+                $messageBytes = [System.Convert]::FromBase64String('${messageBase64}')
+                $message = [System.Text.Encoding]::UTF8.GetString($messageBytes)
+                Write-EventLog -LogName Application -Source $source -EntryType ${entryType} -EventId 1000 -Message $message
             } catch {
                 # Silently fail if can't write to event log
             }
