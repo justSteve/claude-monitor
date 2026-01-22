@@ -1,0 +1,17 @@
+# Runtime state
+state.json
+beads-filed.json
+
+# Logs
+logs/
+
+# Node.js
+node_modules/
+
+# SQLite database
+db/claude_monitor.db
+db/claude_monitor.db-shm
+db/claude_monitor.db-wal
+
+# Environment
+.env

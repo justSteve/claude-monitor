@@ -1,0 +1,12 @@
+{
+  "roots": [
+    "C:\\Users\\Steve\\.claude",
+    "C:\\MyStuff"
+  ],
+  "logDirectory": "./logs",
+  "stateFile": "./state.json",
+  "timezone": "Central Standard Time",
+  "apiUrl": "http://localhost:3000/api/v1",
+  "apiEnabled": true,
+  "fallbackToJson": true
+}

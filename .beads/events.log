@@ -1,0 +1,8 @@
+2026-01-06T17:56:28Z|bd.issue.create|claude-monitor-79n|unknown|1767722188|Migrate claude-monitor from Node.js to Bun
+2026-01-08T18:58:08Z|bd.issue.create|claude-monitor-0gq|unknown|1767898688|Conversation Capture for History Review
+2026-01-08T18:58:40Z|bd.issue.create|claude-monitor-umu|unknown|1767898720|Schema migration for conversation tables
+2026-01-08T18:58:42Z|bd.issue.create|claude-monitor-djp|unknown|1767898722|JSONL/TXT conversation parser
+2026-01-08T18:58:43Z|bd.issue.create|claude-monitor-l5v|unknown|1767898723|Artifact extractor service
+2026-01-08T18:58:45Z|bd.issue.create|claude-monitor-scu|unknown|1767898725|Config file metadata extractor
+2026-01-08T18:58:46Z|bd.issue.create|claude-monitor-1tb|unknown|1767898726|Conversation API endpoints
+2026-01-08T18:58:48Z|bd.issue.create|claude-monitor-yvv|unknown|1767898728|Conversation browser frontend

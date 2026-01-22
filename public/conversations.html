@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversations - Claude Monitor</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/conversations.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="nav-bar">
+            <a href="/" class="nav-brand">Claude Monitor</a>
+            <div class="nav-links">
+                <a href="/">File Changes</a>
+                <a href="/conversations.html" class="active">Conversations</a>
+            </div>
+        </nav>
+
+        <div class="conversations-layout">
+            <!-- Left Panel: Conversation List -->
+            <aside class="conv-sidebar">
+                <div class="sidebar-header">
+                    <h2>Conversations</h2>
+                    <div class="sidebar-controls">
+                        <label class="filter-checkbox">
+                            <input type="checkbox" id="filterErrors">
+                            Errors only
+                        </label>
+                    </div>
+                </div>
+                <div class="conv-list" id="convList">
+                    <div class="loading">Loading...</div>
+                </div>
+            </aside>
+
+            <!-- Center Panel: Conversation Detail -->
+            <main class="conv-main">
+                <div class="conv-detail" id="convDetail">
+                    <div class="empty-state">
+                        <p>Select a conversation to view details</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel: Artifact Detail -->
+            <aside class="artifact-panel" id="artifactPanel">
+                <div class="panel-header">
+                    <h3>Artifact Details</h3>
+                    <button class="close-btn" id="closeArtifact">&times;</button>
+                </div>
+                <div class="artifact-content" id="artifactContent">
+                    <div class="empty-state">
+                        <p>Click an artifact to view details</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script type="module" src="js/conversations.js"></script>
+</body>
+</html>

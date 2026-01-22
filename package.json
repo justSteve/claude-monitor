@@ -1,0 +1,21 @@
+{
+  "name": "claude-monitor",
+  "version": "2.1.0",
+  "description": "Claude Context File Monitor - Multi-tier Web Application",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "bun server/index.js",
+    "dev": "bun --watch server/index.js",
+    "migrate": "bun scripts/migrate.js",
+    "import-logs": "bun scripts/import-json-logs.js",
+    "backfill": "bun scripts/backfill-conversations.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  },
+  "private": true
+}
