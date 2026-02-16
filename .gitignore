@@ -15,3 +15,5 @@ db/claude_monitor.db-wal
 
 # Environment
 .env
+data/
+dist/
