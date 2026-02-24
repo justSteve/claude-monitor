@@ -4,6 +4,30 @@
 **Role:** Infrastructure service provider — the enterprise's memory and recall layer
 **Bead Prefix:** `claude-monitor`
 
+## STOP — Beads Gate (Read This First)
+
+**This repo is beads-first. You MUST authorize work before doing it.**
+
+Before making ANY substantive changes (creating/modifying files, installing deps, changing config), do this:
+
+```bash
+bd ready                    # See if there's already an open bead for this work
+bd create -t "Short title"  # Create one if not — YOU own this, don't ask the user
+bd update <id> --status in_progress  # Claim it
+```
+
+When done:
+```bash
+bd close <id>               # Mark complete
+bd sync                     # Sync with git
+```
+
+Reference the bead ID in your commit messages: `[claude-monitor-xxx] description`.
+
+**No bead = no work.** Minor housekeeping (typos, status fields) is exempt. Everything else gets a bead. If in doubt, create one — it's cheap. See `.claude/rules/beads-first.md` for the full rule.
+
+**This is not optional. This is not a Gas Town thing. This is how THIS repo works, every session, every instance.**
+
 ## What This Is
 
 claude-monitor is the **institutional memory** of Steve's Zgent enterprise. It collects, indexes, and serves conversation history, extracted artifacts, configuration snapshots, and memory files from all Claude Code sessions across all projects.
@@ -69,7 +93,7 @@ Key endpoints for agent consumers:
 ## What Every Claude Instance Must Understand
 
 1. **This is infrastructure, not an application.** claude-monitor exists to make every other agent smarter.
-2. **Beads-first.** See `.claude/rules/beads-first.md`.
+2. **Beads-first is non-negotiable.** Read the gate at the top of this file. Use `bd` commands. No exceptions.
 3. **Service provider permissions.** This zgent has broad READ access across the enterprise. See `.claude/rules/zgent-permissions.md`.
 4. **CASS is the search future.** The CASS migration (semantic + lexical hybrid search) is the path forward for query capabilities.
 5. **Memory aggregation is the next frontier.** Indexing MEMORY.md files across all zgent repos turns scattered per-repo knowledge into enterprise-wide recall.
