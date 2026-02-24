@@ -20,6 +20,9 @@ db/claude_monitor.db-wal
 data/
 dist/
 
+# Research clones
+_research/
+
 # GT beads runtime (not source — issues.jsonl IS tracked)
 .beads/beads.db
 .beads/beads.db-shm
