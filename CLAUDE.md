@@ -147,4 +147,4 @@ powershell .\Monitor-ClaudeFiles.ps1
 | `Monitor-ClaudeFiles.ps1` | Windows file scanner |
 | `config.json` | Scan root configuration |
 | `db/claude_monitor.db` | SQLite database |
-| `.beads/` | GT beads (work authorization) |
+| `.beads/` | Beads work authorization (`bd` CLI) |

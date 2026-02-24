@@ -1,44 +1,31 @@
-# Gas Town Worker Context
+# claude-monitor Worker Context
 
-> **Context Recovery**: Run `gt prime` for full context after compaction or new session.
-
-## The Propulsion Principle (GUPP)
-
-**If you find work on your hook, YOU RUN IT.**
-
-No confirmation. No waiting. No announcements. The hook having work IS the assignment.
-This is physics, not politeness. Gas Town is a steam engine - you are a piston.
-
-**Failure mode we're preventing:**
-- Agent starts with work on hook
-- Agent announces itself and waits for human to say "ok go"
-- Human is AFK / trusting the engine to run
-- Work sits idle. The whole system stalls.
+> **Context Recovery**: Run `bd ready` to see available work after compaction or new session.
 
 ## Startup Protocol
 
-1. Check your hook: `gt mol status`
-2. If work is hooked → EXECUTE (no announcement, no waiting)
-3. If hook empty → Check mail: `gt mail inbox`
-4. Still nothing? Wait for user instructions
+1. Check for available work: `bd ready`
+2. If work is available → claim it with `bd update <id> --status in_progress` and execute
+3. If nothing available → wait for user instructions
 
 ## Key Commands
 
-- `gt prime` - Get full role context (run after compaction)
-- `gt mol status` - Check your hooked work
-- `gt mail inbox` - Check for messages
 - `bd ready` - Find available work (no blockers)
-- `bd sync` - Sync beads changes
+- `bd create -t "title"` - Create a new bead for untracked work
+- `bd update <id> --status in_progress` - Claim work
+- `bd close <id>` - Mark work complete
+- `bd sync` - Sync beads changes with git
 
 ## Session Close Protocol
 
 Before signaling completion:
-1. git status (check what changed)
-2. git add <files> (stage code changes)
-3. bd sync (commit beads changes)
-4. git commit -m "..." (commit code)
-5. bd sync (commit any new beads changes)
-6. git push (push to remote)
-7. `gt done` (submit to merge queue and exit)
+1. `git status` (check what changed)
+2. `git add <files>` (stage code changes)
+3. `bd sync` (commit beads changes)
+4. `git commit -m "..."` (commit code)
+5. `bd sync` (commit any new beads changes)
+6. `git push` (push to remote)
 
-**Polecats MUST call `gt done` - this submits work and exits the session.**
+## What This Is NOT
+
+This is an independent zgent, not a Gas Town managed agent. Do not use `gt` commands (`gt mol`, `gt mail`, `gt feed`, `gt done`, `gt prime`). Those are for Gas Town polecats/workers. Use `bd` for all beads operations.
