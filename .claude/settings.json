@@ -1,11 +1,20 @@
 {
   "permissions": {
     "allow": [
+      "Bash(cd:*)",
+      "Bash(echo:*)",
+      "Bash(pwd:*)",
+      "Bash(which:*)",
+      "Bash(test:*)",
+      "Bash(sleep:*)",
+      "Bash(true:*)",
       "Bash(git:*)",
       "Bash(gh:*)",
+      "Bash(gt:*)",
       "Bash(bd:*)",
       "Bash(bun:*)",
       "Bash(npm:*)",
+      "Bash(npx:*)",
       "Bash(cass:*)",
       "Bash(curl:*)",
       "Bash(powershell:*)",
