@@ -15,5 +15,18 @@ db/claude_monitor.db-wal
 
 # Environment
 .env
+
+# Build output
 data/
 dist/
+
+# GT beads runtime (not source — issues.jsonl IS tracked)
+.beads/beads.db
+.beads/beads.db-shm
+.beads/beads.db-wal
+.beads/daemon.lock
+.beads/daemon.log
+.beads/daemon.pid
+.beads/bd.sock
+.beads/.local_version
+.beads/last-touched

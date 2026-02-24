@@ -1,40 +1,114 @@
-# claude-monitor
+# claude-monitor — Enterprise Institutional Memory Service
 
-claude-monitor is an observability zgent (in-process toward Zgent certification) that tracks file changes across `.claude/` directories in the enterprise. It watches how Claude Code sessions evolve — what rules change, what configs drift, what conversations accumulate — and surfaces that through a REST API and web dashboard.
+**Zgent Status:** zgent (in-process toward Zgent certification)
+**Role:** Infrastructure service provider — the enterprise's memory and recall layer
+**Bead Prefix:** `claude-monitor`
 
-## Mission
+## What This Is
 
-Provide enterprise-wide visibility into Claude Code session state. When the COO deploys artifacts to zgents, when rules change, when configs drift — claude-monitor sees it. Sibling zgents can query the API to understand the current state of the enterprise's Claude Code configurations.
+claude-monitor is the **institutional memory** of Steve's Zgent enterprise. It collects, indexes, and serves conversation history, extracted artifacts, configuration snapshots, and memory files from all Claude Code sessions across all projects.
+
+Every agent in the enterprise benefits from recall. When any zgent needs to know "what was decided about X" or "when did we last discuss Y" or "what code was written for Z" — claude-monitor is the answer.
+
+## Why This Is Foundational
+
+DReader surfaces **external** intel (Discord channels). claude-monitor surfaces **internal** intel (every conversation Claude has had across the enterprise). This makes it more foundational than DReader because:
+
+- Architectural decisions live in past conversations
+- Bug fixes, workarounds, and anti-patterns are captured in session history
+- Memory files (MEMORY.md) across repos contain distilled knowledge
+- Configuration evolution is tracked through snapshots
+- Every agent's context improves when institutional memory is queryable
+
+## Service Contract
+
+claude-monitor **serves other agents** with:
+
+1. **Conversation Search** — Full-text and semantic search across all Claude Code sessions
+2. **Artifact Retrieval** — Code blocks, tool calls, JSON objects extracted from conversations
+3. **Memory Aggregation** — Collected MEMORY.md files, rules, and CLAUDE.md from all zgent repos
+4. **Config History** — How .claude/ configurations have evolved over time
+5. **Session Timeline** — When work happened, what changed, who was involved
 
 ## Architecture
 
-| Component | Path | Purpose |
-|-----------|------|---------|
-| PowerShell Scanner | `Monitor-ClaudeFiles.ps1` | Windows Task Scheduler job, scans `.claude/` dirs every 5 min |
-| API Server | `server/` | Node.js/Bun REST API with SQLite backend |
-| Web Dashboard | `public/` | Browser UI — scan history, file changes, conversations |
-| Scripts | `scripts/` | Migration, backfill, JSON log import utilities |
-| Config | `config.json` | Scan roots (`C:\Users\Steve\.claude`, `C:\MyStuff`), API settings |
-
 ```
-PowerShell Monitor → logs/*.json → Node.js Server (SQLite) → Web Dashboard
+┌──────────────────────┐     ┌─────────────────┐     ┌────────────────┐
+│ PowerShell Monitor   │────▶│ Bun API Server  │────▶│ Web Dashboard  │
+│ (Task Scheduler)     │     │ (REST API)      │     │ (viewer.html)  │
+└──────────────────────┘     └─────────────────┘     └────────────────┘
+         │                           │
+         ▼                           ▼
+    logs/*.json                 SQLite DB
+                                     │
+                               ┌─────┴─────┐
+                               │ CASS Index │  (semantic search layer)
+                               └───────────┘
 ```
 
-## Key Commands
+## API Endpoints
 
-```bash
-bun install          # Install dependencies (or npm install)
-bun run start        # Start API server on :3000
-bun run scripts/migrate.js        # Run DB migrations
-bun run scripts/backfill-conversations.js  # Backfill conversation data
-```
+Base URL: `http://localhost:3000/api/v1`
+
+Key endpoints for agent consumers:
+- `GET /conversations` — List/search conversations
+- `GET /conversations/:id/entries` — Get conversation messages
+- `GET /conversations/:id/artifacts` — Get extracted artifacts
+- `GET /artifacts/search?q=` — Search artifacts across all conversations
+- `GET /files/search?q=` — Search tracked config files
+- `GET /health` — Health check
+
+## Current State
+
+- **Scanner:** PowerShell file monitor on Windows Task Scheduler (5-min interval)
+- **Server:** Bun-powered Express API with SQLite storage
+- **Dashboard:** Web UI for file changes + conversation browsing
+- **CASS:** Migration in progress (coding_agent_session_search — semantic search, 11-agent support)
+- **Beads:** GT beads daemon active (`bd` CLI)
+
+## What Every Claude Instance Must Understand
+
+1. **This is infrastructure, not an application.** claude-monitor exists to make every other agent smarter.
+2. **Beads-first.** See `.claude/rules/beads-first.md`.
+3. **Service provider permissions.** This zgent has broad READ access across the enterprise. See `.claude/rules/zgent-permissions.md`.
+4. **CASS is the search future.** The CASS migration (semantic + lexical hybrid search) is the path forward for query capabilities.
+5. **Memory aggregation is the next frontier.** Indexing MEMORY.md files across all zgent repos turns scattered per-repo knowledge into enterprise-wide recall.
 
 ## Graduation Status
 
-In-process zgent. Standard artifacts deployed (beads-first, zgent-permissions). Observability role makes claude-monitor a natural candidate for early graduation — it watches the enterprise.
+claude-monitor is on the path to Zgent certification. Current progress:
 
-## Conventions
+- **Standard artifacts deployed** — beads-first, zgent-permissions, .gitignore, .gitattributes, .vscode ✓
+- **ECC session declared** — infrastructure category, bootPriority 5, narrative channel ✓
+- **CLAUDE.md with enterprise identity** — mission, architecture, service contract ✓
+- **Memory aggregation pipeline** — scan + index MEMORY.md files from all zgent repos (gt-zf1.2, open)
+- **MCP server** — expose query API as MCP tools so sibling zgents can call directly (gt-zf1.3, open)
+- **Session boot script** — tmux session creation per ECC declaration (gt-zf1.4, open)
+- **Structured logging conformance** — adopt AOE logging patterns (future)
 
-- Beads-first: self-bead for non-trivial work, reference bead ID in commits
-- Enterprise permissions: read sibling repos, write only own path
-- Uses `bd` (beads daemon) for issue tracking — see AGENTS.md
+## Development
+
+```bash
+# Install dependencies
+bun install
+
+# Start API server
+bun run start
+
+# Run database migrations
+bun run migrate
+
+# Run file monitor manually
+powershell .\Monitor-ClaudeFiles.ps1
+```
+
+## Key Files
+
+| Path | Purpose |
+|------|---------|
+| `server/index.js` | Express API entry point |
+| `server/config.js` | Server configuration |
+| `Monitor-ClaudeFiles.ps1` | Windows file scanner |
+| `config.json` | Scan root configuration |
+| `db/claude_monitor.db` | SQLite database |
+| `.beads/` | GT beads (work authorization) |

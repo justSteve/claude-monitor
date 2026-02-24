@@ -1,3 +1,38 @@
+# === Line Endings ===
+# Normalize to LF on commit, checkout platform-native
+* text=auto
 
-# Use bd merge for beads JSONL files
+# Force LF for source code (critical for WSL/Windows sync)
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.toml text eol=lf
+
+# Force CRLF for Windows-only scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# === Binary (no diff, no merge, no line-ending conversion) ===
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.lock binary
+
+# === Beads ===
+# Custom merge driver for JSONL append-only files
 .beads/issues.jsonl merge=beads
