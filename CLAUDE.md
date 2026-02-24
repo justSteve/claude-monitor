@@ -88,15 +88,27 @@ Key endpoints for agent consumers:
 - **Server:** Bun-powered Express API with SQLite storage
 - **Dashboard:** Web UI for file changes + conversation browsing
 - **CASS:** Migration in progress (coding_agent_session_search — semantic search, 11-agent support)
-- **Beads:** GT beads daemon active (`bd` CLI)
+- **Beads:** `bd` CLI for work authorization (standalone — not a Gas Town managed agent)
+
+## Environment — READ THIS
+
+This repo runs on **Windows**. Your working directory is `C:\myStuff\_infra\claude-monitor`.
+
+- **`bd` works.** The beads daemon runs cross-platform. Use `bd ready`, `bd create`, `bd close`, etc.
+- **`gt` does NOT apply here.** Gas Town CLI (`gt mol`, `gt mail`, `gt feed`, `gt status`) is for Gas Town managed agents (polecats, mayor, deacon). claude-monitor is an independent zgent, not a GT worker. Do NOT run `gt` commands.
+- **Do NOT `cd` to your own directory.** You are already there. Compound `cd && command` triggers Claude Code security prompts and is unnecessary.
+- **No tmux.** This is Windows. tmux sessions are a WSL concept.
+- **PowerShell is available** for Windows-native operations.
+- **Bun and Node are available** for running the server and scripts.
 
 ## What Every Claude Instance Must Understand
 
 1. **This is infrastructure, not an application.** claude-monitor exists to make every other agent smarter.
 2. **Beads-first is non-negotiable.** Read the gate at the top of this file. Use `bd` commands. No exceptions.
-3. **Service provider permissions.** This zgent has broad READ access across the enterprise. See `.claude/rules/zgent-permissions.md`.
-4. **CASS is the search future.** The CASS migration (semantic + lexical hybrid search) is the path forward for query capabilities.
-5. **Memory aggregation is the next frontier.** Indexing MEMORY.md files across all zgent repos turns scattered per-repo knowledge into enterprise-wide recall.
+3. **This is not a Gas Town agent.** `gt` commands do not apply. Use `bd` for beads, `bun`/`npm` for dev, `powershell` for system tasks.
+4. **Service provider permissions.** This zgent has broad READ access across the enterprise. See `.claude/rules/zgent-permissions.md`.
+5. **CASS is the search future.** The CASS migration (semantic + lexical hybrid search) is the path forward for query capabilities.
+6. **Memory aggregation is the next frontier.** Indexing MEMORY.md files across all zgent repos turns scattered per-repo knowledge into enterprise-wide recall.
 
 ## Graduation Status
 
