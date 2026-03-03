@@ -30,7 +30,7 @@ Reference the bead ID in your commit messages: `[claude-monitor-xxx] description
 
 ## What This Is
 
-claude-monitor is the **institutional memory** of Steve's Zgent enterprise. It collects, indexes, and serves conversation history, extracted artifacts, configuration snapshots, and memory files from all Claude Code sessions across all projects.
+claude-monitor is the **institutional memory** of the Zgent enterprise. It collects, indexes, and serves conversation history, extracted artifacts, configuration snapshots, and memory files from all Claude Code sessions across all projects.
 
 Every agent in the enterprise benefits from recall. When any zgent needs to know "what was decided about X" or "when did we last discuss Y" or "what code was written for Z" — claude-monitor is the answer.
 

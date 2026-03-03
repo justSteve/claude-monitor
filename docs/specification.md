@@ -38,7 +38,7 @@ logs/
 ```json
 {
   "roots": [
-    "C:\\Users\\Steve\\.claude",
+    "C:\\Users\\<username>\\.claude",
     "C:\\MyStuff"
   ],
   "logDirectory": "./logs",
@@ -92,7 +92,7 @@ Each file contains an array of scan results for that day, appended with each run
     "filesNoChange": 40,
     "filesWithChange": [
       {
-        "path": "C:\\Users\\Steve\\.claude\\settings.json",
+        "path": "C:\\Users\\<username>\\.claude\\settings.json",
         "sizeBytes": 1842,
         "deltaSizeBytes": 128,
         "status": "MODIFIED",
@@ -144,7 +144,7 @@ Runtime persistence between scans. Not committed to git.
 {
   "lastScan": "1/2/26 2:25 PM",
   "files": {
-    "C:\\Users\\Steve\\.claude\\settings.json": {
+    "C:\\Users\\<username>\\.claude\\settings.json": {
       "sizeBytes": 1714,
       "lastModified": "1/2/26 12:15 PM"
     },
@@ -174,7 +174,7 @@ Runtime persistence between scans. Not committed to git.
 1. **Load config** from `config.json`
 2. **Load previous state** from `state.json` (empty object if first run)
 3. **Discover files**:
-   - For `C:\Users\Steve\.claude`: scan that folder directly (non-recursive)
+   - For `C:\Users\<username>\.claude`: scan that folder directly (non-recursive)
    - For `C:\MyStuff`: find all `.claude` folders recursively, then get all files within each
 4. **Build current state** dictionary with path, size, lastModified, attributes
 5. **Compare states**:
