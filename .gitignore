@@ -15,6 +15,7 @@ db/claude_monitor.db-wal
 
 # Environment
 .env
+.claude/settings.local.json
 
 # Build output
 data/
