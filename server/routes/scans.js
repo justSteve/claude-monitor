@@ -57,9 +57,23 @@ router.get('/', (req, res, next) => {
             hasChanges
         } = req.query;
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
         const result = scanService.getScans({
-            page: parseInt(page),
-            limit: Math.min(parseInt(limit), config.maxPageSize),
+            page: parsedPage,
+            limit: Math.min(parsedLimit, config.maxPageSize),
             startDate,
             endDate,
             hasChanges: hasChanges === 'true' ? true : hasChanges === 'false' ? false : undefined
@@ -99,7 +113,15 @@ router.get('/by-date/:date', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
     try {
         const { id } = req.params;
-        const scan = scanService.getScanById(parseInt(id));
+        const parsedId = parseInt(id);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const scan = scanService.getScanById(parsedId);
 
         if (!scan) {
             const error = new Error('Scan not found');

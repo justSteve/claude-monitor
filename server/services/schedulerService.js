@@ -127,7 +127,13 @@ class SchedulerService {
                     stderr += data.toString();
                 });
 
+                const timeoutId = setTimeout(() => {
+                    ps.kill();
+                    reject(new Error('Scan timed out after 2 minutes'));
+                }, 120000);
+
                 ps.on('close', (code) => {
+                    clearTimeout(timeoutId);
                     if (code === 0) {
                         resolve({ stdout, stderr, code });
                     } else {
@@ -136,14 +142,9 @@ class SchedulerService {
                 });
 
                 ps.on('error', (err) => {
+                    clearTimeout(timeoutId);
                     reject(err);
                 });
-
-                // Timeout after 2 minutes
-                setTimeout(() => {
-                    ps.kill();
-                    reject(new Error('Scan timed out after 2 minutes'));
-                }, 120000);
             });
 
             // Parse output to get change count

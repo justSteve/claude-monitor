@@ -1,4 +1,6 @@
 import fs from 'fs';
+import { createReadStream } from 'fs';
+import { createInterface } from 'readline';
 import crypto from 'crypto';
 import db from '../db/index.js';
 import logger from './logService.js';
@@ -174,7 +176,7 @@ function extractContent(entry) {
 /**
  * Parse a JSONL conversation file
  */
-function parseJSONL(filePath, projectId = null) {
+async function parseJSONL(filePath, projectId = null) {
     if (!fs.existsSync(filePath)) {
         logger.warn(`JSONL file not found: ${filePath}`);
         return { success: false, error: 'File not found' };
@@ -183,14 +185,6 @@ function parseJSONL(filePath, projectId = null) {
     const parseState = getParseState(filePath);
     const startLine = parseState?.last_line_number || 0;
 
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
-    if (lines.length <= startLine) {
-        logger.debug(`No new lines in ${filePath}`);
-        return { success: true, newEntries: 0, skipped: 0 };
-    }
-
     let sessionId = null;
     let metadata = {};
     let newEntries = 0;
@@ -198,23 +192,40 @@ function parseJSONL(filePath, projectId = null) {
     let conversationId = null;
     let entryIndex = startLine;
     let lastHash = null;
+    let lineNumber = 0;
+    const allLines = [];
 
-    // First pass: find session info from any line
-    for (const line of lines) {
-        try {
-            const entry = JSON.parse(line);
-            if (entry.sessionId && !sessionId) {
-                sessionId = entry.sessionId;
-                metadata = {
-                    version: entry.version,
-                    gitBranch: entry.gitBranch,
-                    cwd: entry.cwd,
-                    model: entry.model
-                };
+    // First pass: stream through file to find session info and collect lines
+    const rl = createInterface({
+        input: createReadStream(filePath, { encoding: 'utf8' }),
+        crlfDelay: Infinity
+    });
+
+    for await (const line of rl) {
+        if (!line.trim()) continue;
+        allLines.push(line);
+
+        if (!sessionId) {
+            try {
+                const entry = JSON.parse(line);
+                if (entry.sessionId) {
+                    sessionId = entry.sessionId;
+                    metadata = {
+                        version: entry.version,
+                        gitBranch: entry.gitBranch,
+                        cwd: entry.cwd,
+                        model: entry.model
+                    };
+                }
+            } catch (e) {
+                // Skip malformed lines
             }
-        } catch (e) {
-            // Skip malformed lines
         }
+    }
+
+    if (allLines.length <= startLine) {
+        logger.debug(`No new lines in ${filePath}`);
+        return { success: true, newEntries: 0, skipped: 0 };
     }
 
     // Generate session ID from filename if not found
@@ -235,8 +246,8 @@ function parseJSONL(filePath, projectId = null) {
     }
 
     // Process new lines
-    for (let i = startLine; i < lines.length; i++) {
-        const line = lines[i];
+    for (let i = startLine; i < allLines.length; i++) {
+        const line = allLines[i];
         const lineHash = hashContent(line);
 
         try {
@@ -275,8 +286,8 @@ function parseJSONL(filePath, projectId = null) {
     }
 
     // Update parse state and conversation stats
-    if (newEntries > 0 || lines.length > startLine) {
-        updateParseState(filePath, lines.length, lastHash);
+    if (newEntries > 0 || allLines.length > startLine) {
+        updateParseState(filePath, allLines.length, lastHash);
         updateConversationStats(conversationId);
     }
 
@@ -288,7 +299,7 @@ function parseJSONL(filePath, projectId = null) {
         sessionId,
         newEntries,
         skipped,
-        totalLines: lines.length
+        totalLines: allLines.length
     };
 }
 
@@ -387,11 +398,11 @@ function parseTXT(filePath, projectId = null) {
 /**
  * Process a conversation file (auto-detect format)
  */
-function processFile(filePath, projectId = null) {
+async function processFile(filePath, projectId = null) {
     const ext = filePath.toLowerCase().split('.').pop();
 
     if (ext === 'jsonl') {
-        return parseJSONL(filePath, projectId);
+        return await parseJSONL(filePath, projectId);
     } else if (ext === 'txt') {
         return parseTXT(filePath, projectId);
     } else {

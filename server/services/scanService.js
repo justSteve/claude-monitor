@@ -28,9 +28,38 @@ function parseCentralTimeToISO(dateStr) {
         hours = 0;
     }
 
-    // Create date in Central Time (approximate - doesn't handle DST perfectly)
-    const date = new Date(year, month - 1, day, hours, minutes);
-    return date.toISOString();
+    // Build an ISO-like string and interpret it in America/Chicago (Central Time)
+    const pad = (n) => String(n).padStart(2, '0');
+    const localStr = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00`;
+
+    try {
+        // Use Intl to determine the UTC offset for this specific date in Central Time
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Chicago',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+
+        // Create a probe date, then find the offset by comparing
+        const probeUtc = new Date(`${localStr}Z`);
+        const parts = formatter.formatToParts(probeUtc);
+        const get = (type) => parts.find(p => p.type === type)?.value;
+        const centralStr = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
+
+        // The difference between probe (treated as UTC) and what Central Time shows
+        // tells us the UTC offset for Central Time at that moment
+        const centralDate = new Date(`${centralStr}Z`);
+        const offsetMs = centralDate.getTime() - probeUtc.getTime();
+
+        // Apply the inverse offset to get the true UTC time
+        const utcTime = new Date(probeUtc.getTime() - offsetMs);
+        return utcTime.toISOString();
+    } catch {
+        // Fallback: assume CST (UTC-6) if Intl is unavailable
+        const utcTime = new Date(Date.UTC(year, month - 1, day, hours + 6, minutes));
+        return utcTime.toISOString();
+    }
 }
 
 /**
@@ -149,15 +178,15 @@ function getScans(options = {}) {
     const conditions = [];
 
     if (startDate) {
-        conditions.push('scan_time_iso >= ?');
+        conditions.push('s.scan_time_iso >= ?');
         params.push(startDate);
     }
     if (endDate) {
-        conditions.push('scan_time_iso <= ?');
+        conditions.push('s.scan_time_iso <= ?');
         params.push(endDate);
     }
     if (hasChanges !== undefined) {
-        conditions.push(hasChanges ? 'files_with_change > 0' : 'files_with_change = 0');
+        conditions.push(hasChanges ? 's.files_with_change > 0' : 's.files_with_change = 0');
     }
 
     if (conditions.length > 0) {
@@ -165,37 +194,28 @@ function getScans(options = {}) {
     }
 
     // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM scans ${whereClause}`;
+    const countSql = `SELECT COUNT(*) as total FROM scans s ${whereClause}`;
     const { total } = database.prepare(countSql).get(...params);
 
-    // Get paginated results
+    // Get paginated results with change counts in a single query
     const sql = `
         SELECT
-            id, scan_time as scanTime, scan_time_iso as scanTimeIso,
-            scan_duration_ms as scanDurationMs, projects_scanned as projectsScanned,
-            projects_missing_claude as projectsMissingClaude,
-            files_no_change as filesNoChange, files_with_change as filesWithChange
-        FROM scans
+            s.id, s.scan_time as scanTime, s.scan_time_iso as scanTimeIso,
+            s.scan_duration_ms as scanDurationMs, s.projects_scanned as projectsScanned,
+            s.projects_missing_claude as projectsMissingClaude,
+            s.files_no_change as filesNoChange, s.files_with_change as filesWithChange,
+            COALESCE(SUM(CASE WHEN fc.status = 'NEW' THEN 1 ELSE 0 END), 0) as newCount,
+            COALESCE(SUM(CASE WHEN fc.status = 'MODIFIED' THEN 1 ELSE 0 END), 0) as modifiedCount,
+            COALESCE(SUM(CASE WHEN fc.status = 'DELETED' THEN 1 ELSE 0 END), 0) as deletedCount
+        FROM scans s
+        LEFT JOIN file_changes fc ON fc.scan_id = s.id
         ${whereClause}
-        ORDER BY scan_time_iso DESC
+        GROUP BY s.id
+        ORDER BY s.scan_time_iso DESC
         LIMIT ? OFFSET ?
     `;
 
     const scans = database.prepare(sql).all(...params, limit, offset);
-
-    // Get change counts for each scan
-    const getChangeCounts = database.prepare(`
-        SELECT
-            COUNT(CASE WHEN status = 'NEW' THEN 1 END) as newCount,
-            COUNT(CASE WHEN status = 'MODIFIED' THEN 1 END) as modifiedCount,
-            COUNT(CASE WHEN status = 'DELETED' THEN 1 END) as deletedCount
-        FROM file_changes WHERE scan_id = ?
-    `);
-
-    for (const scan of scans) {
-        const counts = getChangeCounts.get(scan.id);
-        Object.assign(scan, counts);
-    }
 
     return {
         data: scans,
@@ -234,10 +254,15 @@ function getScanById(id) {
     `).all(id);
 
     // Parse attributes JSON
-    scan.filesWithChange = changes.map(c => ({
-        ...c,
-        attributes: JSON.parse(c.attributes || '[]')
-    }));
+    scan.filesWithChange = changes.map(c => {
+        let attributes;
+        try {
+            attributes = JSON.parse(c.attributes || '[]');
+        } catch {
+            attributes = [];
+        }
+        return { ...c, attributes };
+    });
 
     return scan;
 }
@@ -287,10 +312,15 @@ function getScansByDate(dateStr) {
 
     for (const scan of scans) {
         const changes = getChanges.all(scan.id);
-        scan.filesWithChange = changes.map(c => ({
-            ...c,
-            attributes: JSON.parse(c.attributes || '[]')
-        }));
+        scan.filesWithChange = changes.map(c => {
+            let attributes;
+            try {
+                attributes = JSON.parse(c.attributes || '[]');
+            } catch {
+                attributes = [];
+            }
+            return { ...c, attributes };
+        });
     }
 
     return { data: scans };

@@ -19,6 +19,8 @@ import schedulerRouter from './routes/scheduler.js';
 import conversationsRouter from './routes/conversations.js';
 import artifactsRouter from './routes/artifacts.js';
 import configsRouter from './routes/configs.js';
+import searchRouter from './routes/search.js';
+import * as zgentSearchBridge from './services/zgentSearchBridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +33,18 @@ logger.info('Database initialized');
 
 // Security middleware
 app.use(helmet({
-    contentSecurityPolicy: false // Allow inline scripts for simple frontend
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:"],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"]
+        }
+    }
 }));
 
 // CORS
@@ -62,6 +75,7 @@ app.use(`${apiBase}/scheduler`, schedulerRouter);
 app.use(`${apiBase}/conversations`, conversationsRouter);
 app.use(`${apiBase}/artifacts`, artifactsRouter);
 app.use(`${apiBase}/config-snapshots`, configsRouter);
+app.use(`${apiBase}/search`, searchRouter);
 
 // Health check - includes scheduler status
 app.get(`${apiBase}/health`, (req, res) => {
@@ -96,6 +110,7 @@ app.use(errorHandler);
 // Graceful shutdown
 function shutdown() {
     logger.info('Shutting down gracefully...', {}, true);
+    zgentSearchBridge.stop();
     scheduler.stop();
     db.close();
     process.exit(0);
@@ -124,6 +139,9 @@ const server = app.listen(config.port, config.host, () => {
         logger.info('Auto-starting scheduler', { intervalMs: config.scanIntervalMs });
         scheduler.start();
     }
+
+    // Start zgent search bridge (Layer 0 JSONL interface)
+    zgentSearchBridge.start();
 });
 
 export default app;

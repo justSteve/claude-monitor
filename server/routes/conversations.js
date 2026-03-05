@@ -19,19 +19,39 @@ router.get('/', (req, res, next) => {
             limit = config.defaultPageSize
         } = req.query;
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const parsedProjectId = project_id ? parseInt(project_id) : undefined;
+
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (project_id && isNaN(parsedProjectId)) {
+            const error = new Error('project_id must be a valid integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
         const conversations = conversationParser.listConversations({
-            projectId: project_id ? parseInt(project_id) : undefined,
+            projectId: parsedProjectId,
             since,
             hasErrors: has_errors === 'true',
-            limit: Math.min(parseInt(limit), config.maxPageSize),
-            offset: (parseInt(page) - 1) * parseInt(limit)
+            limit: Math.min(parsedLimit, config.maxPageSize),
+            offset: (parsedPage - 1) * parsedLimit
         });
 
         res.json({
             data: conversations,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit)
+                page: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (err) {
@@ -46,7 +66,15 @@ router.get('/', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
     try {
         const { id } = req.params;
-        const conversation = conversationParser.getConversation(parseInt(id));
+        const parsedId = parseInt(id);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const conversation = conversationParser.getConversation(parsedId);
 
         if (!conversation) {
             const error = new Error('Conversation not found');
@@ -73,17 +101,37 @@ router.get('/:id/entries', (req, res, next) => {
             limit = config.defaultPageSize
         } = req.query;
 
-        const entries = conversationParser.getConversationEntries(parseInt(id), {
+        const parsedId = parseInt(id);
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const entries = conversationParser.getConversationEntries(parsedId, {
             role,
-            limit: Math.min(parseInt(limit), config.maxPageSize),
-            offset: (parseInt(page) - 1) * parseInt(limit)
+            limit: Math.min(parsedLimit, config.maxPageSize),
+            offset: (parsedPage - 1) * parsedLimit
         });
 
         res.json({
             data: entries,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit)
+                page: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (err) {
@@ -106,19 +154,39 @@ router.get('/:id/artifacts', (req, res, next) => {
             limit = config.defaultPageSize
         } = req.query;
 
-        const artifacts = artifactExtractor.getConversationArtifacts(parseInt(id), {
+        const parsedId = parseInt(id);
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const artifacts = artifactExtractor.getConversationArtifacts(parsedId, {
             type,
             toolName: tool_name,
             outcome,
-            limit: Math.min(parseInt(limit), config.maxPageSize),
-            offset: (parseInt(page) - 1) * parseInt(limit)
+            limit: Math.min(parsedLimit, config.maxPageSize),
+            offset: (parsedPage - 1) * parsedLimit
         });
 
         res.json({
             data: artifacts,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit)
+                page: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (err) {
@@ -133,19 +201,26 @@ router.get('/:id/artifacts', (req, res, next) => {
 router.post('/:id/extract', (req, res, next) => {
     try {
         const { id } = req.params;
+        const parsedId = parseInt(id);
 
-        const conversation = conversationParser.getConversation(parseInt(id));
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const conversation = conversationParser.getConversation(parsedId);
         if (!conversation) {
             const error = new Error('Conversation not found');
             error.statusCode = 404;
             throw error;
         }
 
-        const result = artifactExtractor.processConversationEntries(parseInt(id));
+        const result = artifactExtractor.processConversationEntries(parsedId);
 
         res.json({
             success: result.success,
-            conversationId: parseInt(id),
+            conversationId: parsedId,
             extracted: {
                 toolCalls: result.toolCalls || 0,
                 toolResults: result.toolResults || 0,
@@ -166,18 +241,25 @@ router.post('/:id/extract', (req, res, next) => {
 router.get('/:id/stats', (req, res, next) => {
     try {
         const { id } = req.params;
+        const parsedId = parseInt(id);
 
-        const conversation = conversationParser.getConversation(parseInt(id));
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const conversation = conversationParser.getConversation(parsedId);
         if (!conversation) {
             const error = new Error('Conversation not found');
             error.statusCode = 404;
             throw error;
         }
 
-        const stats = artifactExtractor.getArtifactStats(parseInt(id));
+        const stats = artifactExtractor.getArtifactStats(parsedId);
 
         res.json({
-            conversationId: parseInt(id),
+            conversationId: parsedId,
             ...stats
         });
     } catch (err) {

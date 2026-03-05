@@ -17,18 +17,38 @@ router.get('/', (req, res, next) => {
             limit = config.defaultPageSize
         } = req.query;
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const parsedProjectId = project_id ? parseInt(project_id) : undefined;
+
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (project_id && isNaN(parsedProjectId)) {
+            const error = new Error('project_id must be a valid integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
         const snapshots = configExtractor.listConfigSnapshots({
-            projectId: project_id ? parseInt(project_id) : undefined,
+            projectId: parsedProjectId,
             fileType: file_type,
-            limit: Math.min(parseInt(limit), config.maxPageSize),
-            offset: (parseInt(page) - 1) * parseInt(limit)
+            limit: Math.min(parsedLimit, config.maxPageSize),
+            offset: (parsedPage - 1) * parsedLimit
         });
 
         res.json({
             data: snapshots,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit)
+                page: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (err) {
@@ -43,14 +63,27 @@ router.get('/', (req, res, next) => {
 router.get('/project/:projectId', (req, res, next) => {
     try {
         const { projectId } = req.params;
-        const configs = configExtractor.getProjectConfigs(parseInt(projectId));
+        const parsedProjectId = parseInt(projectId);
+
+        if (isNaN(parsedProjectId) || parsedProjectId < 1) {
+            const error = new Error('projectId must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const configs = configExtractor.getProjectConfigs(parsedProjectId);
 
         res.json({
-            projectId: parseInt(projectId),
-            configs: configs.map(c => ({
-                ...c,
-                metadata: JSON.parse(c.metadata)
-            }))
+            projectId: parsedProjectId,
+            configs: configs.map(c => {
+                let metadata;
+                try {
+                    metadata = JSON.parse(c.metadata);
+                } catch {
+                    metadata = {};
+                }
+                return { ...c, metadata };
+            })
         });
     } catch (err) {
         next(err);

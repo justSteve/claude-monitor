@@ -4,7 +4,7 @@
  * Usage: npm run migrate
  */
 
-const db = require('../server/db');
+import db from '../server/db/index.js';
 
 console.log('Running database migrations...');
 

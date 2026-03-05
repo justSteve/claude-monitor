@@ -24,19 +24,39 @@ router.get('/search', (req, res, next) => {
             throw error;
         }
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const parsedProjectId = project_id ? parseInt(project_id) : undefined;
+
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (project_id && isNaN(parsedProjectId)) {
+            const error = new Error('project_id must be a valid integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
         const artifacts = artifactExtractor.searchArtifacts(q.trim(), {
-            projectId: project_id ? parseInt(project_id) : undefined,
+            projectId: parsedProjectId,
             type,
-            limit: Math.min(parseInt(limit), config.maxPageSize),
-            offset: (parseInt(page) - 1) * parseInt(limit)
+            limit: Math.min(parsedLimit, config.maxPageSize),
+            offset: (parsedPage - 1) * parsedLimit
         });
 
         res.json({
             data: artifacts,
             query: q.trim(),
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit)
+                page: parsedPage,
+                limit: parsedLimit
             }
         });
     } catch (err) {

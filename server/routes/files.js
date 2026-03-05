@@ -17,11 +17,31 @@ router.get('/', (req, res, next) => {
             limit = config.defaultPageSize
         } = req.query;
 
+        const parsedPage = parseInt(page);
+        const parsedLimit = parseInt(limit);
+        const parsedProjectId = projectId ? parseInt(projectId) : undefined;
+
+        if (isNaN(parsedPage) || parsedPage < 1) {
+            const error = new Error('page must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (projectId && isNaN(parsedProjectId)) {
+            const error = new Error('projectId must be a valid integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
         const result = fileService.getTrackedFiles({
-            projectId: projectId ? parseInt(projectId) : undefined,
+            projectId: parsedProjectId,
             includeDeleted: includeDeleted === 'true',
-            page: parseInt(page),
-            limit: Math.min(parseInt(limit), config.maxPageSize)
+            page: parsedPage,
+            limit: Math.min(parsedLimit, config.maxPageSize)
         });
 
         res.json(result);
@@ -58,7 +78,15 @@ router.get('/search', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
     try {
         const { id } = req.params;
-        const file = fileService.getFileById(parseInt(id));
+        const parsedId = parseInt(id);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const file = fileService.getFileById(parsedId);
 
         if (!file) {
             const error = new Error('File not found');
@@ -81,7 +109,21 @@ router.get('/:id/history', (req, res, next) => {
         const { id } = req.params;
         const { limit = 50 } = req.query;
 
-        const result = fileService.getFileHistory(parseInt(id), parseInt(limit));
+        const parsedId = parseInt(id);
+        const parsedLimit = parseInt(limit);
+
+        if (isNaN(parsedId) || parsedId < 1) {
+            const error = new Error('id must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (isNaN(parsedLimit) || parsedLimit < 1) {
+            const error = new Error('limit must be a positive integer');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const result = fileService.getFileHistory(parsedId, parsedLimit);
 
         if (!result) {
             const error = new Error('File not found');

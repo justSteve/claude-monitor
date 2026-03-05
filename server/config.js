@@ -31,7 +31,12 @@ const config = {
     maxPageSize: 100,
 
     // Scan behavior
-    skipEmptyScans: process.env.SKIP_EMPTY_SCANS !== 'false' // Default true - don't store zero-change scans
+    skipEmptyScans: process.env.SKIP_EMPTY_SCANS !== 'false', // Default true - don't store zero-change scans
+
+    // CASS search integration
+    cassBinary: process.env.CASS_BINARY || '/usr/local/bin/cass',
+    cassWindowsDataDir: process.env.CASS_WINDOWS_DATA_DIR || '/root/.local/share/coding-agent-search-windows',
+    cassTimeoutMs: parseInt(process.env.CASS_TIMEOUT_MS) || 30000
 };
 
 export default config;
