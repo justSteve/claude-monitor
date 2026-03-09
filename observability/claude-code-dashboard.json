@@ -1,0 +1,255 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Claude Code Enterprise Observability — Monitor usage, costs, and performance across all zgents",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Overview",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "red", "value": 50}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(claude_code_session_count_total{job=\"otel-collector\"}[1h]))", "legendFormat": "Sessions (1h)", "refId": "A"}],
+      "title": "Active Sessions (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}]},
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[1h]))", "legendFormat": "Cost (1h)", "refId": "A"}],
+      "title": "Cost (Last Hour)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10000}, {"color": "red", "value": 50000}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[1h]))", "legendFormat": "Tokens (1h)", "refId": "A"}],
+      "title": "Token Usage (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 100}, {"color": "red", "value": 500}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(claude_code_lines_of_code_count_total{job=\"otel-collector\"}[1h]))", "legendFormat": "Lines Changed (1h)", "refId": "A"}],
+      "title": "Lines of Code (1h)",
+      "type": "stat"
+    },
+    {
+      "title": "Cost & Usage Analysis",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"axisLabel": "USD", "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never", "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}},
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "id": 5,
+      "options": {"legend": {"calcs": ["max", "mean"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[1h]))", "legendFormat": "{{model}}", "refId": "A"}],
+      "title": "Cost by Model (Hourly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"axisLabel": "Tokens", "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "scaleDistribution": {"type": "log", "log": 10}, "showPoints": "never", "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "id": 6,
+      "options": {"legend": {"calcs": ["max", "mean"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]) * 60)", "legendFormat": "{{type}}", "refId": "A"}],
+      "title": "Token Usage Rate by Type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"axisLabel": "Requests", "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}
+        }
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "id": 15,
+      "options": {"legend": {"calcs": ["lastNotNull", "max", "mean"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (model) (changes(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[5m]))", "legendFormat": "{{model}}", "refId": "A"}],
+      "title": "API Requests by Model (5min rate)",
+      "type": "timeseries"
+    },
+    {
+      "title": "Tool Usage & Performance",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 23},
+      "id": 7,
+      "targets": [{"expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" [5m]))", "legendFormat": "{{tool_name}}", "refId": "A"}],
+      "title": "Tool Usage Rate Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "fieldConfig": {"defaults": {"unit": "percent", "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 80}, {"color": "green", "value": 95}]}}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 23},
+      "id": 8,
+      "targets": [{"expr": "100 * (sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" | json | success=\"true\" [15m]))) / (sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" [15m])))", "legendFormat": "{{tool_name}}", "refId": "A"}],
+      "title": "Tool Success Rate",
+      "type": "timeseries"
+    },
+    {
+      "title": "Performance & Errors",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 31},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "fieldConfig": {"defaults": {"unit": "ms", "custom": {"axisLabel": "Milliseconds"}}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "id": 9,
+      "targets": [{"expr": "avg by (model) (avg_over_time({service_name=\"claude-code\"} |= \"claude_code.api_request\" | unwrap duration_ms [$__interval]))", "legendFormat": "{{model}}", "refId": "A"}],
+      "title": "API Request Duration by Model",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "fieldConfig": {"defaults": {"custom": {"axisLabel": "Errors/min", "drawStyle": "bars", "fillOpacity": 80, "stacking": {"group": "A", "mode": "normal"}}}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "id": 10,
+      "targets": [{"expr": "sum by (status_code) (rate({service_name=\"claude-code\"} |= \"claude_code.api_error\" | json | __error__ = \"\" [$__interval]))", "legendFormat": "HTTP {{status_code}}", "refId": "A"}],
+      "title": "API Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "title": "User Activity & Productivity",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 40},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+      "id": 11,
+      "targets": [{"expr": "sum by (type) (rate(claude_code_lines_of_code_count_total{job=\"otel-collector\"}[5m]) * 60)", "legendFormat": "{{type}} lines/min", "refId": "A"}],
+      "title": "Code Changes Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 80, "stacking": {"group": "A", "mode": "normal"}}}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 41},
+      "id": 12,
+      "targets": [
+        {"expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\"}[1h])) or vector(0)", "legendFormat": "Commits", "refId": "A"},
+        {"expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\"}[1h])) or vector(0)", "legendFormat": "Pull Requests", "refId": "B"}
+      ],
+      "title": "Development Activity (Hourly)",
+      "type": "timeseries"
+    },
+    {
+      "title": "Event Logs",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 49},
+      "collapsed": false
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 50},
+      "id": 13,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "showTime": true, "sortOrder": "Descending"},
+      "targets": [{"expr": "{service_name=\"claude-code\"} |= \"claude_code.tool_result\" | line_format \"{{.event_timestamp}} [{{.tool_name}}] {{if eq .success \\\"true\\\"}}OK{{else}}FAIL{{end}} {{.duration_ms}}ms\"", "refId": "A"}],
+      "title": "Tool Execution Events",
+      "type": "logs"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 50},
+      "id": 17,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "showTime": true, "sortOrder": "Descending"},
+      "targets": [{"expr": "{service_name=\"claude-code\"} |= \"claude_code.api_error\" | line_format \"{{.event_timestamp}} [{{.model}}] HTTP {{.status_code}} {{.duration_ms}}ms ERROR: {{.error}}\"", "refId": "A"}],
+      "title": "API Error Events",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["claude-code", "observability", "enterprise"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "Claude Code Enterprise Observability",
+  "uid": "claude-code-obs",
+  "version": 1
+}
