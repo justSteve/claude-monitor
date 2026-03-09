@@ -34,3 +34,7 @@ _research/
 .beads/bd.sock
 .beads/.local_version
 .beads/last-touched
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
