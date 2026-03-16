@@ -1,11 +1,10 @@
 /**
  * Logging Service
- * Handles file logging and Windows Event Log integration
+ * Handles file logging for claude-monitor
  */
 
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
 import config from '../config.js';
 
 const LOG_LEVELS = {
@@ -21,25 +20,12 @@ class LogService {
     constructor() {
         this.logDir = config.logDir;
         this.logLevel = LOG_LEVELS[config.logLevel.toUpperCase()] ?? LOG_LEVELS.INFO;
-        // Validate eventSource contains only alphanumeric characters (defense-in-depth)
-        const rawEventSource = 'ClaudeMonitor';
-        this.eventSource = /^[a-zA-Z0-9_-]+$/.test(rawEventSource) ? rawEventSource : 'ClaudeMonitor';
         this.maxLogFiles = 7; // Keep 7 days of logs
         this.currentLogFile = null;
         this.currentLogDate = null;
-        this.isWSL = this._detectWSL();
 
         this._ensureLogDir();
         this._cleanOldLogs();
-    }
-
-    _detectWSL() {
-        try {
-            const release = fs.readFileSync('/proc/version', 'utf8');
-            return release.toLowerCase().includes('microsoft');
-        } catch {
-            return false;
-        }
     }
 
     _ensureLogDir() {
@@ -89,48 +75,10 @@ class LogService {
     }
 
     /**
-     * Write to Windows Event Log
-     * @param {string} message - Log message
-     * @param {string} entryType - 'Information', 'Warning', or 'Error'
+     * Write to Windows Event Log — permanent no-op in WSL
      */
     _writeToEventLog(message, entryType = 'Information') {
-        // Windows Event Log is unavailable in WSL — skip silently
-        if (this.isWSL) return;
-
-        // Validate entryType to prevent injection
-        const validEntryTypes = ['Information', 'Warning', 'Error'];
-        if (!validEntryTypes.includes(entryType)) {
-            entryType = 'Information';
-        }
-
-        // Encode message as Base64 to avoid command injection vulnerabilities
-        // Direct string interpolation is unsafe even with quote escaping due to
-        // PowerShell metacharacters like $(), backticks, and newlines
-        const messageBase64 = Buffer.from(String(message), 'utf8').toString('base64');
-
-        const script = `
-            $source = '${this.eventSource}'
-            if (-not [System.Diagnostics.EventLog]::SourceExists($source)) {
-                try {
-                    New-EventLog -LogName Application -Source $source -ErrorAction Stop
-                } catch {
-                    # Source might already exist or need admin rights
-                }
-            }
-            try {
-                $messageBytes = [System.Convert]::FromBase64String('${messageBase64}')
-                $message = [System.Text.Encoding]::UTF8.GetString($messageBytes)
-                Write-EventLog -LogName Application -Source $source -EntryType ${entryType} -EventId 1000 -Message $message
-            } catch {
-                # Silently fail if can't write to event log
-            }
-        `;
-
-        const ps = spawn('powershell', ['-NoProfile', '-Command', script], {
-            stdio: 'ignore',
-            detached: true
-        });
-        ps.unref();
+        return;
     }
 
     _log(level, message, meta = {}, eventLog = false, eventType = 'Information') {
