@@ -1,22 +1,11 @@
 /**
  * Scheduler Service
- * Runs file monitoring on a configurable interval
+ * Runs native file scanner on a configurable interval
  */
 
-import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
 import config from '../config.js';
 import logger from './logService.js';
-
-function detectWSL() {
-    try {
-        const release = fs.readFileSync('/proc/version', 'utf8');
-        return release.toLowerCase().includes('microsoft');
-    } catch {
-        return false;
-    }
-}
+import fileScanner from './fileScannerService.js';
 
 class SchedulerService {
     constructor() {
@@ -30,13 +19,8 @@ class SchedulerService {
         this.nextRun = null;
         this.runCount = 0;
         this.errorCount = 0;
-        this.scriptPath = path.join(config.rootDir, 'Monitor-ClaudeFiles.ps1');
-        this.isWSL = detectWSL();
     }
 
-    /**
-     * Start the scheduler
-     */
     start() {
         if (this.timer) {
             logger.warn('Scheduler already running');
@@ -56,9 +40,6 @@ class SchedulerService {
         this._updateNextRun();
     }
 
-    /**
-     * Stop the scheduler
-     */
     stop() {
         if (this.timer) {
             clearInterval(this.timer);
@@ -67,17 +48,11 @@ class SchedulerService {
         }
     }
 
-    /**
-     * Run a scan immediately (outside of schedule)
-     */
     async runNow() {
         logger.info('Manual scan triggered');
         return this._runScan();
     }
 
-    /**
-     * Get scheduler status
-     */
     getStatus() {
         return {
             running: this.timer !== null,
@@ -101,19 +76,7 @@ class SchedulerService {
         }
     }
 
-    /**
-     * Execute the PowerShell monitoring script
-     * In WSL, the PowerShell scanner is unavailable — report as skipped
-     */
-    async _runScan() {
-        if (this.isWSL) {
-            this.lastRun = new Date().toISOString();
-            this.lastRunStatus = 'skipped_wsl';
-            this.runCount++;
-            logger.debug('PowerShell scan skipped (WSL environment)');
-            return { skipped: true, reason: 'wsl_no_powershell' };
-        }
-
+    _runScan() {
         if (this.isRunning) {
             logger.warn('Scan already in progress, skipping');
             return { skipped: true, reason: 'already_running' };
@@ -124,68 +87,18 @@ class SchedulerService {
         const startTime = Date.now();
 
         try {
-            logger.debug('Starting scan');
+            const result = fileScanner.scan();
 
-            const result = await new Promise((resolve, reject) => {
-                const ps = spawn('powershell', [
-                    '-NoProfile',
-                    '-ExecutionPolicy', 'Bypass',
-                    '-File', this.scriptPath
-                ], {
-                    cwd: config.rootDir,
-                    stdio: ['ignore', 'pipe', 'pipe']
-                });
-
-                let stdout = '';
-                let stderr = '';
-
-                ps.stdout.on('data', (data) => {
-                    stdout += data.toString();
-                });
-
-                ps.stderr.on('data', (data) => {
-                    stderr += data.toString();
-                });
-
-                const timeoutId = setTimeout(() => {
-                    ps.kill();
-                    reject(new Error('Scan timed out after 2 minutes'));
-                }, 120000);
-
-                ps.on('close', (code) => {
-                    clearTimeout(timeoutId);
-                    if (code === 0) {
-                        resolve({ stdout, stderr, code });
-                    } else {
-                        reject(new Error(`PowerShell exited with code ${code}: ${stderr || stdout}`));
-                    }
-                });
-
-                ps.on('error', (err) => {
-                    clearTimeout(timeoutId);
-                    reject(err);
-                });
-            });
-
-            // Parse output to get change count
-            const changesMatch = result.stdout.match(/Files with changes:\s*(\d+)/);
-            this.lastRunChanges = changesMatch ? parseInt(changesMatch[1]) : 0;
-
+            this.lastRunChanges = result.filesWithChange.length;
             this.lastRun = new Date().toISOString();
             this.lastRunDuration = Date.now() - startTime;
             this.lastRunStatus = 'success';
             this._updateNextRun();
 
-            logger.debug('Scan completed', {
-                duration: this.lastRunDuration,
-                changes: this.lastRunChanges
-            });
-
             return {
                 success: true,
                 duration: this.lastRunDuration,
-                changes: this.lastRunChanges,
-                output: result.stdout
+                changes: this.lastRunChanges
             };
 
         } catch (err) {
@@ -209,7 +122,5 @@ class SchedulerService {
     }
 }
 
-// Singleton instance
 const schedulerService = new SchedulerService();
-
 export default schedulerService;
