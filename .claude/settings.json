@@ -67,5 +67,19 @@
       "Glob(*)",
       "Grep(*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/projects/gtOps/zgent-ops/hooks/perm-audit-hook.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
   }
 }

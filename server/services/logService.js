@@ -27,9 +27,19 @@ class LogService {
         this.maxLogFiles = 7; // Keep 7 days of logs
         this.currentLogFile = null;
         this.currentLogDate = null;
+        this.isWSL = this._detectWSL();
 
         this._ensureLogDir();
         this._cleanOldLogs();
+    }
+
+    _detectWSL() {
+        try {
+            const release = fs.readFileSync('/proc/version', 'utf8');
+            return release.toLowerCase().includes('microsoft');
+        } catch {
+            return false;
+        }
     }
 
     _ensureLogDir() {
@@ -84,6 +94,9 @@ class LogService {
      * @param {string} entryType - 'Information', 'Warning', or 'Error'
      */
     _writeToEventLog(message, entryType = 'Information') {
+        // Windows Event Log is unavailable in WSL — skip silently
+        if (this.isWSL) return;
+
         // Validate entryType to prevent injection
         const validEntryTypes = ['Information', 'Warning', 'Error'];
         if (!validEntryTypes.includes(entryType)) {

@@ -4,9 +4,19 @@
  */
 
 import { spawn } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import config from '../config.js';
 import logger from './logService.js';
+
+function detectWSL() {
+    try {
+        const release = fs.readFileSync('/proc/version', 'utf8');
+        return release.toLowerCase().includes('microsoft');
+    } catch {
+        return false;
+    }
+}
 
 class SchedulerService {
     constructor() {
@@ -21,6 +31,7 @@ class SchedulerService {
         this.runCount = 0;
         this.errorCount = 0;
         this.scriptPath = path.join(config.rootDir, 'Monitor-ClaudeFiles.ps1');
+        this.isWSL = detectWSL();
     }
 
     /**
@@ -92,8 +103,17 @@ class SchedulerService {
 
     /**
      * Execute the PowerShell monitoring script
+     * In WSL, the PowerShell scanner is unavailable — report as skipped
      */
     async _runScan() {
+        if (this.isWSL) {
+            this.lastRun = new Date().toISOString();
+            this.lastRunStatus = 'skipped_wsl';
+            this.runCount++;
+            logger.debug('PowerShell scan skipped (WSL environment)');
+            return { skipped: true, reason: 'wsl_no_powershell' };
+        }
+
         if (this.isRunning) {
             logger.warn('Scan already in progress, skipping');
             return { skipped: true, reason: 'already_running' };
