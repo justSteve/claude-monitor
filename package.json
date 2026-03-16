@@ -9,7 +9,8 @@
     "dev": "bun --watch server/index.js",
     "migrate": "bun scripts/migrate.js",
     "import-logs": "bun scripts/import-json-logs.js",
-    "backfill": "bun scripts/backfill-conversations.js"
+    "backfill": "bun scripts/backfill-conversations.js",
+    "test": "bun test"
   },
   "dependencies": {
     "cors": "^2.8.5",
