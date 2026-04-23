@@ -24,6 +24,10 @@ import * as zgentSearchBridge from './services/zgentSearchBridge.js';
 import { createEntityStore } from './services/entityStoreService.js';
 import { createEccSync } from './services/eccSyncService.js';
 import { createEntitiesRouter } from './routes/entities.js';
+import * as cassSearchService from './services/cassSearchService.js';
+import { searchMempalace } from './services/mempalaceClient.js';
+import { createUnifiedSearch } from './services/unifiedSearchService.js';
+import { createUnifiedSearchRouter } from './routes/unifiedSearch.js';
 import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +46,13 @@ const entityMigrationSql = readFileSync(
 );
 rawDb.exec(entityMigrationSql);
 const entityStore = createEntityStore(rawDb);
+
+// Unified search service (co-1pc)
+const unifiedSearch = createUnifiedSearch({
+    cassSearch: cassSearchService,
+    mempalaceSearch: { search: searchMempalace },
+    entityStore
+});
 
 // ECC entity sync on startup
 if (config.eccSyncOnStartup) {
@@ -95,6 +106,7 @@ app.use(`${apiBase}/scheduler`, schedulerRouter);
 app.use(`${apiBase}/conversations`, conversationsRouter);
 app.use(`${apiBase}/artifacts`, artifactsRouter);
 app.use(`${apiBase}/config-snapshots`, configsRouter);
+app.use(`${apiBase}/search/unified`, createUnifiedSearchRouter(unifiedSearch));
 app.use(`${apiBase}/search`, searchRouter);
 app.use(`${apiBase}/entities`, createEntitiesRouter(entityStore));
 
