@@ -1,0 +1,10 @@
+{
+  "weights": {
+    "bm25": 0.4,
+    "semantic": 0.4,
+    "entity": 0.2
+  },
+  "timeoutMs": 2000,
+  "defaultLimit": 10,
+  "maxLimit": 100
+}
