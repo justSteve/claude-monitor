@@ -21,6 +21,10 @@ import artifactsRouter from './routes/artifacts.js';
 import configsRouter from './routes/configs.js';
 import searchRouter from './routes/search.js';
 import * as zgentSearchBridge from './services/zgentSearchBridge.js';
+import { createEntityStore } from './services/entityStoreService.js';
+import { createEccSync } from './services/eccSyncService.js';
+import { createEntitiesRouter } from './routes/entities.js';
+import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +34,22 @@ const app = express();
 // Initialize database
 db.init();
 logger.info('Database initialized');
+
+// Entity store (unified memory search - co-1pc)
+const rawDb = db.getRawDb();
+const entityMigrationSql = readFileSync(
+    path.join(__dirname, 'db', 'migrations', '001-entity-store.sql'), 'utf-8'
+);
+rawDb.exec(entityMigrationSql);
+const entityStore = createEntityStore(rawDb);
+
+// ECC entity sync on startup
+if (config.eccSyncOnStartup) {
+    const eccSync = createEccSync(entityStore, config.eccSeedPath);
+    Promise.resolve(eccSync.syncAll())
+        .then(result => logger.info('ECC sync complete', result))
+        .catch(err => logger.error('ECC sync failed', { error: err.message }));
+}
 
 // Security middleware
 app.use(helmet({
@@ -76,6 +96,7 @@ app.use(`${apiBase}/conversations`, conversationsRouter);
 app.use(`${apiBase}/artifacts`, artifactsRouter);
 app.use(`${apiBase}/config-snapshots`, configsRouter);
 app.use(`${apiBase}/search`, searchRouter);
+app.use(`${apiBase}/entities`, createEntitiesRouter(entityStore));
 
 // Health check - includes scheduler status
 app.get(`${apiBase}/health`, (req, res) => {
@@ -100,7 +121,7 @@ app.get(`${apiBase}/health`, (req, res) => {
 });
 
 // Fallback to index.html for SPA-like behavior
-app.get('*', (req, res) => {
+app.get('{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 

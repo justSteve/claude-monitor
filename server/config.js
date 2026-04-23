@@ -47,6 +47,7 @@ const config = {
 
     // ECC seed data
     eccSeedPath: process.env.ECC_SEED_PATH || path.join(rootDir, 'server', 'data', 'ecc-seed.json'),
+    eccSyncOnStartup: process.env.ECC_SYNC_ON_STARTUP !== 'false',
 };
 
 export default config;

@@ -4,6 +4,7 @@ import path from 'path';
 import config from '../config.js';
 
 let db = null;
+let rawDb = null;
 
 /**
  * Wraps Bun's SQLite Database to provide better-sqlite3 compatible API
@@ -42,8 +43,8 @@ function init() {
         fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    const bunDb = new Database(config.dbPath);
-    db = wrapDatabase(bunDb);
+    rawDb = new Database(config.dbPath);
+    db = wrapDatabase(rawDb);
 
     // Enable WAL mode for better concurrent read performance
     db.pragma('journal_mode = WAL');
@@ -69,6 +70,15 @@ function getDb() {
 }
 
 /**
+ * Get raw bun:sqlite Database instance (bypasses wrapper)
+ * Used by services that need the native bun:sqlite API (e.g. db.query())
+ */
+function getRawDb() {
+    if (!rawDb) init();
+    return rawDb;
+}
+
+/**
  * Close database connection
  */
 function close() {
@@ -91,12 +101,14 @@ export {
     init,
     getDb,
     close,
-    transaction
+    transaction,
+    getRawDb
 };
 
 export default {
     init,
     getDb,
     close,
-    transaction
+    transaction,
+    getRawDb
 };
