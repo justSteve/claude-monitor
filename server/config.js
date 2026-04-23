@@ -48,6 +48,10 @@ const config = {
     // ECC seed data
     eccSeedPath: process.env.ECC_SEED_PATH || path.join(rootDir, 'server', 'data', 'ecc-seed.json'),
     eccSyncOnStartup: process.env.ECC_SYNC_ON_STARTUP !== 'false',
+
+    // MemPalace CLI integration
+    mempalaceBinary: process.env.MEMPALACE_BINARY || 'mempalace',
+    mempalaceTimeoutMs: parseInt(process.env.MEMPALACE_TIMEOUT_MS) || 2000,
 };
 
 export default config;
