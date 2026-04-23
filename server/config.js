@@ -44,6 +44,9 @@ const config = {
         { path: '/root/projects', mode: 'projects' }
     ])),
     scanStateFile: process.env.SCAN_STATE_FILE || path.join(rootDir, 'data', 'scan-state.json'),
+
+    // ECC seed data
+    eccSeedPath: process.env.ECC_SEED_PATH || path.join(rootDir, 'server', 'data', 'ecc-seed.json'),
 };
 
 export default config;

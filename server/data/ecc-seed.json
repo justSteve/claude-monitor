@@ -1,0 +1,140 @@
+{
+  "zgents": [
+    {
+      "name": "Gas City",
+      "prefix": "gc",
+      "status": "active",
+      "description": "Multi-target orchestration",
+      "repo": "justSteve/gas-city",
+      "tier": "orchestrator"
+    },
+    {
+      "name": "COO",
+      "prefix": "co",
+      "status": "active",
+      "description": "Chief Operating Officer \u2014 enterprise operations",
+      "repo": "justSteve/COO",
+      "tier": "orchestrator"
+    },
+    {
+      "name": "PaneWarden",
+      "prefix": "pw",
+      "status": "active",
+      "description": "Shared executable space steward (tmux)",
+      "repo": "justSteve/PaneWarden",
+      "tier": "orchestrator"
+    },
+    {
+      "name": "DReader",
+      "prefix": "dr",
+      "status": "active",
+      "description": "Discord intelligence service provider",
+      "repo": "justSteve/DReader",
+      "tier": "service-provider"
+    },
+    {
+      "name": "claude-monitor",
+      "prefix": null,
+      "status": "pending",
+      "description": "Claude session monitoring and search",
+      "repo": "justSteve/claude-monitor",
+      "tier": "service-provider"
+    },
+    {
+      "name": "Strader",
+      "prefix": null,
+      "status": "pending",
+      "description": "Trading agent",
+      "tier": "consumer"
+    },
+    {
+      "name": "ParseClipmate",
+      "prefix": null,
+      "status": "pending",
+      "tier": "consumer"
+    },
+    {
+      "name": "BitWarden",
+      "prefix": null,
+      "status": "pending",
+      "tier": "restricted"
+    },
+    {
+      "name": "myStuff",
+      "prefix": null,
+      "status": "pending",
+      "tier": "consumer"
+    },
+    {
+      "name": "myFireplace",
+      "prefix": null,
+      "status": "pending",
+      "tier": "consumer"
+    },
+    {
+      "name": "IDEasPlatform",
+      "prefix": null,
+      "status": "pending",
+      "tier": "consumer"
+    }
+  ],
+  "people": [
+    {
+      "name": "Steve",
+      "role": "Enterprise director/owner"
+    }
+  ],
+  "conventions": [
+    {
+      "name": "beads-first",
+      "description": "Substantive work requires bead authorization"
+    },
+    {
+      "name": "tmux-when-it-helps",
+      "description": "Use tmux via send-keys when it adds value"
+    },
+    {
+      "name": "zgent-permissions",
+      "description": "Filesystem and GitHub boundaries"
+    },
+    {
+      "name": "zgent-initialization",
+      "description": "Three-layer alignment for zgent setup"
+    },
+    {
+      "name": "production-grade-default",
+      "description": "COO owns code quality"
+    }
+  ],
+  "tools": [
+    {
+      "name": "gc",
+      "description": "Gas City tmux-based orchestration CLI",
+      "aliases": [
+        "Gas City CLI",
+        "gascity"
+      ]
+    },
+    {
+      "name": "beads",
+      "description": "Issue tracking system",
+      "aliases": [
+        "bd"
+      ]
+    },
+    {
+      "name": "CASS",
+      "description": "Coding Agent Search Service",
+      "aliases": [
+        "cass"
+      ]
+    },
+    {
+      "name": "MemPalace",
+      "description": "Vector memory palace (ChromaDB)",
+      "aliases": [
+        "mempalace"
+      ]
+    }
+  ]
+}
