@@ -29,6 +29,10 @@ import { searchMempalace } from './services/mempalaceClient.js';
 import { createUnifiedSearch } from './services/unifiedSearchService.js';
 import { createUnifiedSearchRouter } from './routes/unifiedSearch.js';
 import { readFileSync } from 'fs';
+import { createMcpServer, startMcpStdio, isMcpEnabled } from './mcp/mcpServer.js';
+import { createDecayService } from './services/decayService.js';
+import { createPromotionService } from './services/promotionService.js';
+import { createProposalsRouter } from './routes/proposals.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,7 +49,28 @@ const entityMigrationSql = readFileSync(
     path.join(__dirname, 'db', 'migrations', '001-entity-store.sql'), 'utf-8'
 );
 rawDb.exec(entityMigrationSql);
+
+// Access log migration (co-1pc phase 3)
+const accessLogMigrationSql = readFileSync(
+    path.join(__dirname, 'db', 'migrations', '002-memory-metadata.sql'), 'utf-8'
+);
+rawDb.exec(accessLogMigrationSql);
+
+// Decay state migration (co-1pc phase 4)
+const decayMigrationSql = readFileSync(
+    path.join(__dirname, 'db', 'migrations', '003-decay-state.sql'), 'utf-8'
+);
+rawDb.exec(decayMigrationSql);
+
 const entityStore = createEntityStore(rawDb);
+const decayService = createDecayService(rawDb);
+
+// Promotion migration and service (co-1pc phase 5)
+const promotionMigrationSql = readFileSync(
+    path.join(__dirname, 'db', 'migrations', '004-promotion.sql'), 'utf-8'
+);
+rawDb.exec(promotionMigrationSql);
+const promotionService = createPromotionService(rawDb);
 
 // Unified search service (co-1pc)
 const unifiedSearch = createUnifiedSearch({
@@ -60,6 +85,34 @@ if (config.eccSyncOnStartup) {
     Promise.resolve(eccSync.syncAll())
         .then(result => logger.info('ECC sync complete', result))
         .catch(err => logger.error('ECC sync failed', { error: err.message }));
+}
+
+// MCP server (co-1pc phase 3) — only when explicitly enabled
+if (isMcpEnabled()) {
+    const mcpServer = createMcpServer({ unifiedSearch, entityStore, db: rawDb });
+    startMcpStdio(mcpServer)
+        .then(() => logger.info('MCP stdio server running'))
+        .catch(err => logger.error('MCP server failed to start', { error: err.message }));
+}
+
+// Decay engine schedule (co-1pc phase 4) — nightly at 3 AM
+if (config.decayEnabled !== false) {
+    // Check if decay should run immediately (past 3 AM and hasn't run today)
+    const scheduleDecay = () => {
+        const now = new Date();
+        const hour = now.getHours();
+        const msUntil3AM = ((3 - hour + 24) % 24) * 60 * 60 * 1000;
+        const interval = 24 * 60 * 60 * 1000; // 24 hours
+
+        // Schedule recurring nightly decay
+        setTimeout(() => {
+            decayService.runDecayCycle();
+            setInterval(() => decayService.runDecayCycle(), interval);
+        }, msUntil3AM);
+
+        logger.info('Decay engine scheduled', { nextRunInMs: msUntil3AM });
+    };
+    scheduleDecay();
 }
 
 // Security middleware
@@ -109,11 +162,15 @@ app.use(`${apiBase}/config-snapshots`, configsRouter);
 app.use(`${apiBase}/search/unified`, createUnifiedSearchRouter(unifiedSearch));
 app.use(`${apiBase}/search`, searchRouter);
 app.use(`${apiBase}/entities`, createEntitiesRouter(entityStore));
+app.use(`${apiBase}/proposals`, createProposalsRouter(promotionService));
 
 // Health check - includes scheduler status
 app.get(`${apiBase}/health`, (req, res) => {
     const database = db.getDb();
     const lastScan = database.prepare('SELECT scan_time FROM scans ORDER BY scan_time_iso DESC LIMIT 1').get();
+    const conversationCount = database.prepare('SELECT COUNT(*) AS n FROM conversations').get().n;
+    const conversationEntryCount = database.prepare('SELECT COUNT(*) AS n FROM conversation_entries').get().n;
+    const lastEntry = database.prepare('SELECT MAX(created_at) AS ts FROM conversation_entries').get();
     const schedulerStatus = scheduler.getStatus();
 
     res.json({
@@ -121,6 +178,9 @@ app.get(`${apiBase}/health`, (req, res) => {
         timestamp: new Date().toISOString(),
         database: 'connected',
         lastStoredScan: lastScan ? lastScan.scan_time : null,
+        conversationCount,
+        conversationEntryCount,
+        lastEntryTimestamp: lastEntry ? lastEntry.ts : null,
         scheduler: {
             running: schedulerStatus.running,
             lastRun: schedulerStatus.lastRun,

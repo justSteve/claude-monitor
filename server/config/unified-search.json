@@ -6,5 +6,21 @@
   },
   "timeoutMs": 2000,
   "defaultLimit": 10,
-  "maxLimit": 100
+  "maxLimit": 100,
+  "decay": {
+    "enabled": true,
+    "schedule": "0 3 * * *",
+    "tiers": {
+      "fast":  { "summary": 14, "oneliner": 30, "archive": 90 },
+      "slow":  { "summary": 60, "oneliner": 120, "archive": 180 }
+    },
+    "salience": true
+  },
+  "promotion": {
+    "enabled": true,
+    "strike_threshold": 3,
+    "min_days_spread": 3,
+    "categories": ["preference", "convention", "antipattern", "tooling"],
+    "auto_write_rules": false
+  }
 }
