@@ -25,6 +25,7 @@ import { createEntityStore } from './services/entityStoreService.js';
 import { createEccSync } from './services/eccSyncService.js';
 import { createEntitiesRouter } from './routes/entities.js';
 import * as cassSearchService from './services/cassSearchService.js';
+import * as transcriptSearchService from './services/transcriptSearchService.js';
 import { searchMempalace } from './services/mempalaceClient.js';
 import { createUnifiedSearch } from './services/unifiedSearchService.js';
 import { createUnifiedSearchRouter } from './routes/unifiedSearch.js';
@@ -73,8 +74,13 @@ rawDb.exec(promotionMigrationSql);
 const promotionService = createPromotionService(rawDb);
 
 // Unified search service (co-1pc)
+// BM25 / transcript-keyword signal is sourced from CM's OWN ingested corpus
+// (conversation_entries — populated by the scheduler for EVERY zgent) rather
+// than the external CASS index, which lagged ingestion and omitted non-COO
+// zgents. See transcriptSearchService.js and co-1la2. cassSearchService is
+// retained for the legacy /api/v1/search route and as a fallback option.
 const unifiedSearch = createUnifiedSearch({
-    cassSearch: cassSearchService,
+    cassSearch: transcriptSearchService,
     mempalaceSearch: { search: searchMempalace },
     entityStore
 });
