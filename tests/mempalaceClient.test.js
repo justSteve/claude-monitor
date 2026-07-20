@@ -1,181 +1,147 @@
+/**
+ * mempalaceClient tests.
+ *
+ * Rewritten 2026-07-20 (co-ujjh). The previous suite asserted a JSON output
+ * contract that MemPalace has never had — the CLI has no --json flag — so the
+ * tests passed green against a parser that could not work on real output. That
+ * is the worst kind of test: it certified a broken integration for months.
+ * Every fixture below is verbatim CLI output.
+ */
+
 import { describe, it, expect } from 'bun:test';
-import { searchMempalace, parseMempalaceOutput } from '../server/services/mempalaceClient.js';
+import { parseSearchOutput } from '../server/services/mempalaceClient.js';
 
-// ── parseMempalaceOutput ────────────────────────────────────────────
+// Verbatim `mempalace search "beads dolt corruption" --results 2` output.
+// Note: [1]/[2] are 1-based INDEXES; the score lives on the `Match:` line;
+// separators are U+2500; content is indented 6 spaces and contains tabs.
+const REAL_OUTPUT = `============================================================
+  Results for: "beads dolt corruption"
+============================================================
 
-describe('parseMempalaceOutput', () => {
-    it('returns [] for empty string', () => {
-        expect(parseMempalaceOutput('')).toEqual([]);
+  [1] beads / cmd
+      Source: dolt_test.go
+      Match:  0.561
+
+      if loadedCfg.DoltServerHost == "10.0.0.1" {
+      \t\tt.Error("REGRESSION: known-bad production values")
+      \t}
+      }
+
+  ────────────────────────────────────────────────────────
+  [2] coo / general
+      Source: beads-persistent-substrate.md
+      Match:  0.556
+
+      ---
+      name: Beads are the persistent substrate
+      description: Everything else gets repaved
+`;
+
+describe('parseSearchOutput — degenerate input', () => {
+    it('returns [] for empty and nullish input', () => {
+        expect(parseSearchOutput('')).toEqual([]);
+        expect(parseSearchOutput(null)).toEqual([]);
+        expect(parseSearchOutput(undefined)).toEqual([]);
+        expect(parseSearchOutput('   \n  \n  ')).toEqual([]);
     });
 
-    it('returns [] for null/undefined', () => {
-        expect(parseMempalaceOutput(null)).toEqual([]);
-        expect(parseMempalaceOutput(undefined)).toEqual([]);
-    });
-
-    it('returns [] for whitespace-only input', () => {
-        expect(parseMempalaceOutput('   \n  \n  ')).toEqual([]);
-    });
-
-    it('parses a valid JSON array', () => {
-        const input = JSON.stringify([
-            { content: 'COO is the operations agent', score: 0.95, wing: 'projects', room: 'COO', file: 'CLAUDE.md' },
-            { content: 'DReader is a reading app', score: 0.82, wing: 'projects', room: 'DReader', file: 'README.md' },
-        ]);
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(2);
-        expect(results[0]).toEqual({
-            content: 'COO is the operations agent',
-            score: 0.95,
-            source: { type: 'mempalace', wing: 'projects', room: 'COO', file: 'CLAUDE.md' },
-        });
-        expect(results[1].source.room).toBe('DReader');
-    });
-
-    it('normalizes alternative JSON field names', () => {
-        const input = JSON.stringify([
-            { text: 'alt text field', score: 0.7, category: 'reference', project: 'MemPalace', path: 'notes.md' },
-        ]);
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(1);
-        expect(results[0].content).toBe('alt text field');
-        expect(results[0].source.wing).toBe('reference');
-        expect(results[0].source.room).toBe('MemPalace');
-        expect(results[0].source.file).toBe('notes.md');
-    });
-
-    it('falls through to text parser for malformed JSON', () => {
-        // JSON parse fails, text parser wraps as raw content
-        const results = parseMempalaceOutput('[{broken json');
-        expect(results).toHaveLength(1);
-        expect(results[0].content).toBe('[{broken json');
-        expect(results[0].score).toBe(0);
-        expect(results[0].source.type).toBe('mempalace');
-    });
-
-    it('falls through to text parser for non-JSON bracket input', () => {
-        // Starts with [ but fails JSON parse, text parser wraps as raw content
-        const results = parseMempalaceOutput('[not json at all');
-        expect(results).toHaveLength(1);
-        expect(results[0].content).toBe('[not json at all');
-        expect(results[0].source.type).toBe('mempalace');
-    });
-
-    it('parses JSONL format (one object per line)', () => {
-        const input = [
-            JSON.stringify({ content: 'line one', score: 0.9, wing: 'projects', room: 'COO', file: 'a.md' }),
-            JSON.stringify({ content: 'line two', score: 0.8, wing: 'reference', room: 'docs', file: 'b.md' }),
-        ].join('\n');
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(2);
-        expect(results[0].content).toBe('line one');
-        expect(results[1].content).toBe('line two');
-    });
-
-    it('skips malformed JSONL lines gracefully', () => {
-        const input = [
-            JSON.stringify({ content: 'good line', score: 0.9, wing: 'w', room: 'r', file: 'f' }),
-            '{broken',
-            JSON.stringify({ content: 'also good', score: 0.7, wing: 'w2', room: 'r2', file: 'f2' }),
-        ].join('\n');
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(2);
-        expect(results[0].content).toBe('good line');
-        expect(results[1].content).toBe('also good');
-    });
-
-    it('parses text format with [score] path header', () => {
-        const input = `[0.95] projects/COO/CLAUDE.md
-COO is the Chief Operating Officer
-
-[0.80] reference/docs/architecture.md
-Architecture overview content here`;
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(2);
-        expect(results[0]).toEqual({
-            content: 'COO is the Chief Operating Officer',
-            score: 0.95,
-            source: { type: 'mempalace', wing: 'projects', room: 'COO', file: 'CLAUDE.md' },
-        });
-        expect(results[1].score).toBe(0.80);
-        expect(results[1].source.file).toBe('architecture.md');
-    });
-
-    it('parses text format with "score: N" header', () => {
-        const input = `score: 0.88
-projects/COO/notes.md
-Some content from the notes file`;
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(1);
-        expect(results[0].score).toBe(0.88);
-        expect(results[0].content).toBe('Some content from the notes file');
-        expect(results[0].source.wing).toBe('projects');
-    });
-
-    it('falls back to raw content when format is unrecognized', () => {
-        const input = 'Just some plain text result with no metadata';
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results).toHaveLength(1);
-        expect(results[0].content).toBe('Just some plain text result with no metadata');
-        expect(results[0].score).toBe(0);
-        expect(results[0].source.type).toBe('mempalace');
-    });
-
-    it('handles missing score in JSON (defaults to 0)', () => {
-        const input = JSON.stringify([
-            { content: 'no score', wing: 'w', room: 'r', file: 'f' },
-        ]);
-
-        const results = parseMempalaceOutput(input);
-        expect(results[0].score).toBe(0);
-    });
-
-    it('handles deeply nested path in text format', () => {
-        const input = '[0.75] projects/COO/docs/plans/deep/file.md\nDeep content';
-
-        const results = parseMempalaceOutput(input);
-
-        expect(results[0].source.wing).toBe('projects');
-        expect(results[0].source.room).toBe('COO');
-        expect(results[0].source.file).toBe('docs/plans/deep/file.md');
+    it('treats a banner with no result blocks as "no matches"', () => {
+        const noHits = `============================================================
+  Results for: "nothing whatsoever"
+============================================================
+`;
+        expect(parseSearchOutput(noHits)).toEqual([]);
     });
 });
 
-// ── searchMempalace ─────────────────────────────────────────────────
+describe('parseSearchOutput — real CLI grammar', () => {
+    const results = parseSearchOutput(REAL_OUTPUT);
 
-describe('searchMempalace', () => {
-    it('returns [] when binary is not found (graceful degradation)', async () => {
-        // The default binary path won't exist in test env
-        const results = await searchMempalace('test query');
-        expect(results).toEqual([]);
+    it('finds every result block', () => {
+        expect(results).toHaveLength(2);
     });
 
-    it('returns [] for empty query', async () => {
-        const results = await searchMempalace('');
-        expect(results).toEqual([]);
+    it('REGRESSION: reads Match: as the score, not the [N] index', () => {
+        // The original parser read `[1]`/`[2]` as the score, yielding 1.0 and
+        // 2.0 — both outside the valid cosine range — and silently discarded
+        // the real ranking. This is the defect that made the signal useless.
+        expect(results[0].score).toBeCloseTo(0.561, 3);
+        expect(results[1].score).toBeCloseTo(0.556, 3);
+        for (const r of results) {
+            expect(r.score).toBeGreaterThan(0);
+            expect(r.score).toBeLessThanOrEqual(1);
+        }
     });
 
-    it('returns [] for null query', async () => {
-        const results = await searchMempalace(null);
-        expect(results).toEqual([]);
+    it('splits "wing / room" and captures the Source: filename', () => {
+        expect(results[0].source).toMatchObject({
+            type: 'mempalace', wing: 'beads', room: 'cmd', file: 'dolt_test.go',
+        });
+        expect(results[1].source).toMatchObject({
+            type: 'mempalace', wing: 'coo', room: 'general',
+            file: 'beads-persistent-substrate.md',
+        });
     });
 
-    it('returns [] for whitespace-only query', async () => {
-        const results = await searchMempalace('   ');
-        expect(results).toEqual([]);
+    it('keeps multi-line content without leaking header lines into it', () => {
+        expect(results[0].content).toContain('loadedCfg.DoltServerHost');
+        expect(results[0].content).toContain('REGRESSION');
+        expect(results[0].content).not.toContain('Source:');
+        expect(results[0].content).not.toContain('Match:');
+    });
+
+    it('strips the common indent but preserves relative indentation', () => {
+        // The corpus contains source code, where indentation carries meaning.
+        const lines = results[0].content.split('\n');
+        expect(lines[0].startsWith(' ')).toBe(false);
+        expect(results[0].content).toContain('\t\tt.Error');
+    });
+
+    it('does not let U+2500 separators become content', () => {
+        expect(results[0].content).not.toContain('─');
+        expect(results[1].content).not.toContain('─');
+    });
+});
+
+describe('parseSearchOutput — content containing blank lines', () => {
+    // The old parser split blocks on blank lines, shredding any multi-paragraph
+    // result. Splitting on the [N] header is what fixes it.
+    const withBlanks = `============================================================
+  Results for: "x"
+============================================================
+
+  [1] coo / docs
+      Source: notes.md
+      Match:  0.900
+
+      first paragraph
+
+      second paragraph after a blank line
+
+      third one
+`;
+
+    it('does not truncate a result at a blank line inside its content', () => {
+        const r = parseSearchOutput(withBlanks);
+        expect(r).toHaveLength(1);
+        expect(r[0].content).toContain('first paragraph');
+        expect(r[0].content).toContain('second paragraph');
+        expect(r[0].content).toContain('third one');
+    });
+
+    it('does not mistake a bracketed number inside content for a new result', () => {
+        const tricky = `  [1] coo / docs
+      Source: notes.md
+      Match:  0.5
+
+      see item [2] below for details
+      and [3] as well
+`;
+        const r = parseSearchOutput(tricky);
+        // Content sits at 6-space indent; the header regex caps indent at 4,
+        // so these must stay inside the single result.
+        expect(r).toHaveLength(1);
+        expect(r[0].content).toContain('[2]');
+        expect(r[0].content).toContain('[3]');
     });
 });

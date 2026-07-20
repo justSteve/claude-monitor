@@ -51,7 +51,7 @@ const config = {
 
     // MemPalace CLI integration
     mempalaceBinary: process.env.MEMPALACE_BINARY || 'mempalace',
-    mempalaceTimeoutMs: parseInt(process.env.MEMPALACE_TIMEOUT_MS) || 2000,
+    mempalaceTimeoutMs: parseInt(process.env.MEMPALACE_TIMEOUT_MS) || 8000,  // cold start ~1.9s; 2000 was below the floor
 
     // Decay engine (co-1pc phase 4)
     decayEnabled: process.env.DECAY_ENABLED !== 'false',
