@@ -11,7 +11,7 @@
 
 import logger from './logService.js';
 
-const { normalizeBM25, fuseScores, deduplicateResults, getConfig } = require('./scoringService.js');
+const { getConfig, normalizeBM25, fuseRankedLists } = require('./scoringService.js');
 
 /**
  * Create a unified search service with injected backends.
@@ -96,46 +96,41 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore }
         const [bm25Candidates, semanticCandidates] = await Promise.all(fanOutPromises);
 
         // ── 2. Normalize BM25 scores ───────────────────────────────
+        // Sigmoid normalization is monotonic, so it does not change BM25's own
+        // ordering — it exists so the reported signal is a readable 0-1 value.
 
         for (const candidate of bm25Candidates) {
-            candidate.signals = {
-                bm25: normalizeBM25(candidate.rawScore),
-                semantic: null,
-                entity: null,
-            };
+            candidate.rawScore = normalizeBM25(candidate.rawScore);
         }
 
-        // ── 3. Set semantic signals ────────────────────────────────
+        // Semantic rawScore is already 0-1 cosine similarity; left as-is.
 
-        for (const candidate of semanticCandidates) {
-            candidate.signals = {
-                bm25: null,
-                semantic: candidate.rawScore,  // Already 0-1 cosine similarity
-                entity: null,
-            };
-        }
+        // ── 3. Fuse by RANK, not by score ──────────────────────────
+        //
+        // These two retrievers draw from different corpora and their scores are
+        // not on comparable scales: normalizeBM25 saturates near 1.0 while
+        // cosine for relevant prose sits at 0.4-0.6. Weighted-sum fusion
+        // therefore ranked every keyword hit above every semantic hit
+        // regardless of relevance — the first semantic result landed past rank
+        // 20 against a default limit of 10, so the signal was invisible even
+        // when working perfectly. Reciprocal rank fusion compares positions
+        // instead of magnitudes, needs no calibration, and gives a document
+        // found by BOTH retrievers the sum of its contributions. co-n7mx.
+        //
+        // Do not "restore" fuseScores here without re-reading that bead.
 
-        // ── 4. Apply entity boost ──────────────────────────────────
+        const entityBoostFor = (enableEntity && entityMatches.length > 0)
+            ? (content) => computeBestEntityBoost(content, entityMatches)
+            : undefined;
 
-        const allCandidates = [...bm25Candidates, ...semanticCandidates];
+        const fused = fuseRankedLists({
+            lists: { bm25: bm25Candidates, semantic: semanticCandidates },
+            weights,
+            entityBoostFor,
+            entityWeight: weights.entity ?? 0,
+        });
 
-        if (enableEntity && entityMatches.length > 0) {
-            for (const candidate of allCandidates) {
-                const boost = computeBestEntityBoost(candidate.content, entityMatches);
-                candidate.signals.entity = boost;
-            }
-        }
-
-        // ── 5. Fuse scores ─────────────────────────────────────────
-
-        for (const candidate of allCandidates) {
-            candidate.score = fuseScores(candidate.signals, weights);
-        }
-
-        // ── 6. Deduplicate and rank ────────────────────────────────
-
-        const deduped = deduplicateResults(allCandidates);
-        const results = deduped.slice(0, limit);
+        const results = fused.slice(0, limit);
 
         logger.debug('Unified search completed', {
             query: queryText,
