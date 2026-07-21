@@ -53,6 +53,11 @@ const config = {
     mempalaceBinary: process.env.MEMPALACE_BINARY || 'mempalace',
     mempalaceTimeoutMs: parseInt(process.env.MEMPALACE_TIMEOUT_MS) || 8000,  // cold start ~1.9s; 2000 was below the floor
 
+    // Vector-recall trial (co-ta0m): per-query JSONL record of whether the
+    // semantic leg contributed results BM25 missed entirely.
+    unifiedTrialLog: process.env.UNIFIED_TRIAL_LOG
+        || path.join(rootDir, 'logs', 'unified-trial.jsonl'),
+
     // Decay engine (co-1pc phase 4)
     decayEnabled: process.env.DECAY_ENABLED !== 'false',
 };

@@ -92,6 +92,7 @@ describe('unified search: fan-out and fusion', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace(mempalaceHits),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('COO conventions');
@@ -123,6 +124,7 @@ describe('unified search: fan-out and fusion', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test query');
@@ -143,6 +145,7 @@ describe('unified search: graceful degradation', () => {
             cassSearch: failingBackend('CASS'),
             mempalaceSearch: mockMempalace(mempalaceHits),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
@@ -161,6 +164,7 @@ describe('unified search: graceful degradation', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: failingBackend('MemPalace'),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
@@ -175,6 +179,7 @@ describe('unified search: graceful degradation', () => {
             cassSearch: failingBackend('CASS'),
             mempalaceSearch: failingBackend('MemPalace'),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
@@ -202,6 +207,7 @@ describe('unified search: signals parameter', () => {
             cassSearch: spyCass,
             mempalaceSearch: mockMempalace(mempalaceHits),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test', { signals: ['semantic', 'entity'] });
@@ -226,6 +232,7 @@ describe('unified search: signals parameter', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: spyMempalace,
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test', { signals: ['bm25', 'entity'] });
@@ -246,6 +253,7 @@ describe('unified search: signals parameter', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('COO test', { signals: ['bm25', 'semantic'] });
@@ -270,6 +278,7 @@ describe('unified search: result structure', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
@@ -290,6 +299,7 @@ describe('unified search: result structure', () => {
             cassSearch: mockCass([]),
             mempalaceSearch: mockMempalace(mempalaceHits),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
@@ -312,6 +322,7 @@ describe('unified search: result structure', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('COO');
@@ -340,6 +351,7 @@ describe('unified search: deduplication', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace(mempalaceHits),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('COO');
@@ -363,6 +375,7 @@ describe('unified search: options', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test', { limit: 5 });
@@ -379,10 +392,84 @@ describe('unified search: options', () => {
             cassSearch: mockCass(cassHits),
             mempalaceSearch: mockMempalace([]),
             entityStore,
+            trialLog: () => {},
         });
 
         const result = await search.query('test');
         // Default limit is 10 from unified-search.json
         expect(result.results.length).toBeLessThanOrEqual(10);
+    });
+});
+
+// ── vector-recall trial instrumentation (co-ta0m) ──────────────────
+
+describe('unified search: trial instrumentation', () => {
+    it('records a semantic-only hit that BM25 missed entirely', async () => {
+        const cassHits = [
+            { snippet: 'keyword result', score: 8.0, source_path: '/kw.md' },
+        ];
+        const mempalaceHits = [
+            { content: 'a purely semantic memory', score: 0.61, source: { type: 'mempalace', wing: 'coo', room: 'technical', file: 'x.md' } },
+        ];
+
+        const records = [];
+        const search = createUnifiedSearch({
+            cassSearch: mockCass(cassHits),
+            mempalaceSearch: mockMempalace(mempalaceHits),
+            entityStore,
+            trialLog: r => records.push(r),
+        });
+
+        await search.query('anything');
+
+        expect(records.length).toBe(1);
+        const rec = records[0];
+        expect(rec.query).toBe('anything');
+        expect(rec.candidates).toEqual({ bm25: 1, semantic: 1 });
+        expect(rec.both).toBe(0);
+        expect(rec.semanticOnly.length).toBe(1);
+        expect(rec.semanticOnly[0].semanticScore).toBe(0.61);
+        expect(rec.semanticOnly[0].source.wing).toBe('coo');
+        expect(rec.semanticOnly[0].pos).toBeGreaterThanOrEqual(1);
+    });
+
+    it('counts agreement (both retrievers) and reports no semantic-only rows', async () => {
+        const shared = 'identical content found by both retrievers';
+        const cassHits = [
+            { snippet: shared, score: 9.0, source_path: '/both.md' },
+        ];
+        const mempalaceHits = [
+            { content: shared, score: 0.7, source: { type: 'mempalace', wing: 'coo', room: 'technical', file: 'both.md' } },
+        ];
+
+        const records = [];
+        const search = createUnifiedSearch({
+            cassSearch: mockCass(cassHits),
+            mempalaceSearch: mockMempalace(mempalaceHits),
+            entityStore,
+            trialLog: r => records.push(r),
+        });
+
+        await search.query('overlap');
+
+        expect(records.length).toBe(1);
+        expect(records[0].both).toBe(1);
+        expect(records[0].semanticOnly).toEqual([]);
+    });
+
+    it('a throwing trial logger does not break the query', async () => {
+        const cassHits = [
+            { snippet: 'result', score: 5.0, source_path: '/r.md' },
+        ];
+
+        const search = createUnifiedSearch({
+            cassSearch: mockCass(cassHits),
+            mempalaceSearch: mockMempalace([]),
+            entityStore,
+            trialLog: () => { throw new Error('disk full'); },
+        });
+
+        const result = await search.query('resilience');
+        expect(result.results.length).toBe(1);
     });
 });

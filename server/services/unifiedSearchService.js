@@ -9,9 +9,31 @@
  * Part of co-1pc: unified memory search — Phase 2, Task 7.
  */
 
+import fs from 'fs';
+
+import serverConfig from '../config.js';
 import logger from './logService.js';
 
 const { getConfig, normalizeBM25, fuseRankedLists } = require('./scoringService.js');
+
+/**
+ * Default trial-log writer: appends one JSONL line per query to
+ * config.unifiedTrialLog. Fire-and-forget — a logging failure must never
+ * break search, so errors are warned once and swallowed.
+ */
+let trialLogWarned = false;
+function appendTrialRecord(record) {
+    const line = JSON.stringify(record) + '\n';
+    fs.appendFile(serverConfig.unifiedTrialLog, line, err => {
+        if (err && !trialLogWarned) {
+            trialLogWarned = true;
+            logger.warn('unified-trial log unwritable; further failures silent', {
+                path: serverConfig.unifiedTrialLog,
+                error: err.message,
+            });
+        }
+    });
+}
 
 /**
  * Create a unified search service with injected backends.
@@ -22,7 +44,7 @@ const { getConfig, normalizeBM25, fuseRankedLists } = require('./scoringService.
  * @param {object} deps.entityStore   - Entity store (createEntityStore result)
  * @returns {object} Unified search API with `query()` method
  */
-export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore }) {
+export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, trialLog = appendTrialRecord }) {
     const config = getConfig();
     const weights = config.weights;
 
@@ -131,6 +153,47 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore }
         });
 
         const results = fused.slice(0, limit);
+
+        // ── 4. Vector-recall trial instrumentation (co-ta0m) ───────
+        //
+        // The trial metric is DIFFERENT ANSWERS, not score deltas: did the
+        // semantic leg put a result in front of the user that BM25 missed
+        // entirely? A result's `ranks` records which retrievers found it, so
+        // semantic-only membership in the returned slice is exact, not
+        // inferred. One JSONL line per query; analyzed at decision time.
+        try {
+            const semanticOnly = [];
+            let both = 0;
+            results.forEach((r, i) => {
+                const inSemantic = r.ranks?.semantic != null;
+                const inBM25 = r.ranks?.bm25 != null;
+                if (inSemantic && inBM25) both++;
+                if (inSemantic && !inBM25) {
+                    semanticOnly.push({
+                        pos: i + 1,
+                        semanticScore: r.signals?.semantic ?? null,
+                        source: r.source,
+                    });
+                }
+            });
+            trialLog({
+                ts: new Date().toISOString(),
+                query: queryText,
+                limit,
+                signals,
+                degraded,
+                timings,
+                candidates: {
+                    bm25: bm25Candidates.length,
+                    semantic: semanticCandidates.length,
+                },
+                returned: results.length,
+                both,
+                semanticOnly,
+            });
+        } catch (err) {
+            logger.warn('trial instrumentation failed', { error: err.message });
+        }
 
         logger.debug('Unified search completed', {
             query: queryText,
