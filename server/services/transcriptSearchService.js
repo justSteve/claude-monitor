@@ -26,63 +26,9 @@
 import db from '../db/index.js';
 import logger from './logService.js';
 
-// Snippet window (chars) returned around the match for display.
-const SNIPPET_MAX_CHARS = 400;
-
-/**
- * Split a free-text query into distinct, non-trivial keyword terms.
- * Keeps tokens of length >= 2; lowercased; deduplicated.
- * @param {string} queryText
- * @returns {string[]}
- */
-function tokenize(queryText) {
-    const seen = new Set();
-    const terms = [];
-    for (const raw of String(queryText).toLowerCase().split(/[^a-z0-9_]+/)) {
-        if (raw.length < 2) continue;
-        if (seen.has(raw)) continue;
-        seen.add(raw);
-        terms.push(raw);
-    }
-    return terms;
-}
-
-/**
- * Build a SNIPPET around the first occurrence of any term.
- * @param {string} content
- * @param {string[]} terms
- * @returns {string}
- */
-function buildSnippet(content, terms) {
-    if (!content) return '';
-    const lower = content.toLowerCase();
-    let firstIdx = -1;
-    for (const term of terms) {
-        const idx = lower.indexOf(term);
-        if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) firstIdx = idx;
-    }
-    if (firstIdx === -1) return content.slice(0, SNIPPET_MAX_CHARS);
-
-    const start = Math.max(0, firstIdx - Math.floor(SNIPPET_MAX_CHARS / 4));
-    const snippet = content.slice(start, start + SNIPPET_MAX_CHARS);
-    return (start > 0 ? '…' : '') + snippet + (start + SNIPPET_MAX_CHARS < content.length ? '…' : '');
-}
-
-/**
- * Count occurrences of a term in content (case-insensitive).
- * @param {string} lowerContent
- * @param {string} term
- * @returns {number}
- */
-function countOccurrences(lowerContent, term) {
-    let count = 0;
-    let idx = lowerContent.indexOf(term);
-    while (idx !== -1) {
-        count++;
-        idx = lowerContent.indexOf(term, idx + term.length);
-    }
-    return count;
-}
+import { tokenize, buildSnippet, coverageTfScore } from './textSearchUtils.js';
+// (extracted to textSearchUtils.js under co-ceyz3.1 so the curated backend
+// scores text identically; behavior unchanged)
 
 /**
  * Search CM's ingested transcript corpus for the query terms.
@@ -141,21 +87,8 @@ async function search(query, filters = {}) {
 
     const scored = [];
     for (const row of rows) {
-        const lower = (row.content || '').toLowerCase();
-        let tf = 0;
-        let coverage = 0;
-        for (const term of terms) {
-            const c = countOccurrences(lower, term);
-            if (c > 0) {
-                coverage++;
-                tf += c;
-            }
-        }
-        if (coverage === 0) continue;
-
-        // Coverage-weighted term frequency. All-terms-present rows rank above
-        // single-term rows; a touch of log dampening on raw frequency.
-        const score = coverage * 10 + Math.log1p(tf);
+        const score = coverageTfScore(row.content, terms);
+        if (score === 0) continue;
 
         scored.push({
             snippet: buildSnippet(row.content, terms),

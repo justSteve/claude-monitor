@@ -425,7 +425,7 @@ describe('unified search: trial instrumentation', () => {
         expect(records.length).toBe(1);
         const rec = records[0];
         expect(rec.query).toBe('anything');
-        expect(rec.candidates).toEqual({ bm25: 1, semantic: 1 });
+        expect(rec.candidates).toEqual({ bm25: 1, semantic: 1, curated: 0 });
         expect(rec.both).toBe(0);
         expect(rec.semanticOnly.length).toBe(1);
         expect(rec.semanticOnly[0].semanticScore).toBe(0.61);

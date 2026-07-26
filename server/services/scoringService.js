@@ -118,6 +118,11 @@ function rrfScore(ranks, weights, k = DEFAULT_RRF_K) {
 function fuseRankedLists({ lists, weights, k = DEFAULT_RRF_K, entityBoostFor, entityWeight = 0 }) {
     const groups = new Map();
 
+    // Signal keys mirror the retriever lists actually fused (plus entity,
+    // which is a boost, not a retriever), so adding a retriever list — e.g.
+    // `curated` (co-ceyz3.1) — needs no template edit here.
+    const signalKeys = [...Object.keys(lists || {}), 'entity'];
+
     for (const [signal, rawList] of Object.entries(lists || {})) {
         for (const cand of assignRanks(rawList)) {
             const hash = contentHash(cand.content || '');
@@ -126,7 +131,7 @@ function fuseRankedLists({ lists, weights, k = DEFAULT_RRF_K, entityBoostFor, en
                     content: cand.content,
                     source: cand.source,
                     additional_sources: [],
-                    signals: { bm25: null, semantic: null, entity: null },
+                    signals: Object.fromEntries(signalKeys.map(key => [key, null])),
                     ranks: {},
                 });
             }

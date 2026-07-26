@@ -26,6 +26,7 @@ import { createEccSync } from './services/eccSyncService.js';
 import { createEntitiesRouter } from './routes/entities.js';
 import * as cassSearchService from './services/cassSearchService.js';
 import * as transcriptSearchService from './services/transcriptSearchService.js';
+import * as curatedSearchService from './services/curatedSearchService.js';
 import { searchMempalace } from './services/mempalaceClient.js';
 import { createUnifiedSearch } from './services/unifiedSearchService.js';
 import { createUnifiedSearchRouter } from './routes/unifiedSearch.js';
@@ -79,10 +80,14 @@ const promotionService = createPromotionService(rawDb);
 // than the external CASS index, which lagged ingestion and omitted non-COO
 // zgents. See transcriptSearchService.js and co-1la2. cassSearchService is
 // retained for the legacy /api/v1/search route and as a fallback option.
+// The curated signal (co-ceyz3.1) searches the deliberately-written memory
+// tiers in place: OKF bundles + every zgent's auto-memory files. CM reads
+// them; it never writes them (okf-memory.md governance).
 const unifiedSearch = createUnifiedSearch({
     cassSearch: transcriptSearchService,
     mempalaceSearch: { search: searchMempalace },
-    entityStore
+    entityStore,
+    curatedSearch: curatedSearchService,
 });
 
 // ECC entity sync on startup
@@ -170,7 +175,8 @@ app.use(`${apiBase}/search`, searchRouter);
 app.use(`${apiBase}/entities`, createEntitiesRouter(entityStore));
 app.use(`${apiBase}/proposals`, createProposalsRouter(promotionService));
 
-// Health check - includes scheduler status
+// Health check - includes scheduler status and uptime
+const serverStartTime = Date.now();
 app.get(`${apiBase}/health`, (req, res) => {
     const database = db.getDb();
     const lastScan = database.prepare('SELECT scan_time FROM scans ORDER BY scan_time_iso DESC LIMIT 1').get();
@@ -182,6 +188,7 @@ app.get(`${apiBase}/health`, (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
+        uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000),
         database: 'connected',
         lastStoredScan: lastScan ? lastScan.scan_time : null,
         conversationCount,
@@ -208,7 +215,7 @@ app.use(errorHandler);
 
 // Graceful shutdown
 function shutdown() {
-    logger.info('Shutting down gracefully...', {}, true);
+    logger.info('CM_LIFECYCLE: shutting_down', { uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000), pid: process.pid }, true);
     zgentSearchBridge.stop();
     scheduler.stop();
     db.close();
@@ -220,7 +227,7 @@ process.on('SIGINT', shutdown);
 
 // Uncaught exception handler
 process.on('uncaughtException', (err) => {
-    logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+    logger.error('CM_LIFECYCLE: crash', { error: err.message, stack: err.stack, uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000) });
     shutdown();
 });
 
@@ -230,7 +237,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start server
 const server = app.listen(config.port, config.host, () => {
-    logger.info(`Server started at http://${config.host}:${config.port}`, {}, true);
+    logger.info('CM_LIFECYCLE: started', { url: `http://${config.host}:${config.port}`, pid: process.pid, nodeVersion: process.version }, true);
     logger.info(`API available at http://${config.host}:${config.port}/api/${config.apiVersion}`);
 
     // Auto-start scheduler if configured

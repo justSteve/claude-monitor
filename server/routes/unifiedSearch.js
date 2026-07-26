@@ -42,12 +42,12 @@ export function createUnifiedSearchRouter(unifiedSearch) {
 
         const parsedLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
         const parsedSignals = signals
-            ? signals.split(',').filter(s => ['bm25', 'semantic', 'entity'].includes(s.trim()))
-            : ['bm25', 'semantic', 'entity'];
+            ? signals.split(',').filter(s => ['bm25', 'semantic', 'entity', 'curated'].includes(s.trim()))
+            : ['bm25', 'semantic', 'entity', 'curated'];
 
         if (parsedSignals.length === 0) {
             return res.status(400).json({
-                error: 'signals must include at least one of: bm25, semantic, entity'
+                error: 'signals must include at least one of: bm25, semantic, entity, curated'
             });
         }
 

@@ -2,6 +2,7 @@
   "weights": {
     "bm25": 0.4,
     "semantic": 0.4,
+    "curated": 0.405,
     "entity": 0.2
   },
   "timeoutMs": 2000,
@@ -11,8 +12,16 @@
     "enabled": true,
     "schedule": "0 3 * * *",
     "tiers": {
-      "fast":  { "summary": 14, "oneliner": 30, "archive": 90 },
-      "slow":  { "summary": 60, "oneliner": 120, "archive": 180 }
+      "fast": {
+        "summary": 14,
+        "oneliner": 30,
+        "archive": 90
+      },
+      "slow": {
+        "summary": 60,
+        "oneliner": 120,
+        "archive": 180
+      }
     },
     "salience": true
   },
@@ -20,7 +29,23 @@
     "enabled": true,
     "strike_threshold": 3,
     "min_days_spread": 3,
-    "categories": ["preference", "convention", "antipattern", "tooling"],
+    "categories": [
+      "preference",
+      "convention",
+      "antipattern",
+      "tooling"
+    ],
     "auto_write_rules": false
+  },
+  "curated": {
+    "refreshSeconds": 60,
+    "bundles": [
+      "/root/projects/COO/conventions",
+      "/root/projects/Strader/knowledge"
+    ],
+    "autoMemoryParent": "/root/.claude/projects",
+    "exclude": [
+      "zepo-prompts"
+    ]
   }
 }

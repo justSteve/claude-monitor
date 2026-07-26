@@ -1,11 +1,15 @@
 /**
  * Scheduler Service
- * Runs native file scanner on a configurable interval
+ * Runs native file scanner and conversation ingestion on a configurable interval
  */
 
+import fs from 'fs';
+import path from 'path';
 import config from '../config.js';
 import logger from './logService.js';
 import fileScanner from './fileScannerService.js';
+import conversationParser from './conversationParserService.js';
+import db from '../db/index.js';
 
 class SchedulerService {
     constructor() {
@@ -76,7 +80,69 @@ class SchedulerService {
         }
     }
 
-    _runScan() {
+    _lookupProjectId(projectDirName) {
+        try {
+            const database = db.getDb();
+            const row = database.prepare('SELECT id FROM projects WHERE name = ?').get(projectDirName);
+            return row?.id || null;
+        } catch {
+            return null;
+        }
+    }
+
+    async _ingestConversations() {
+        const claudeProjectsDir = path.join(config.scanRoots.find(r => r.mode === 'direct')?.path || '/root/.claude', 'projects');
+        if (!fs.existsSync(claudeProjectsDir)) return { parsed: 0, errors: 0 };
+
+        let parsed = 0;
+        let errors = 0;
+
+        let projectDirs;
+        try {
+            projectDirs = fs.readdirSync(claudeProjectsDir, { withFileTypes: true });
+        } catch {
+            return { parsed: 0, errors: 0 };
+        }
+
+        for (const dir of projectDirs) {
+            if (!dir.isDirectory()) continue;
+            const dirPath = path.join(claudeProjectsDir, dir.name);
+            const projectId = this._lookupProjectId(dir.name);
+
+            let files;
+            try {
+                files = fs.readdirSync(dirPath);
+            } catch {
+                continue;
+            }
+
+            for (const file of files) {
+                if (!file.endsWith('.jsonl')) continue;
+                const filePath = path.join(dirPath, file);
+                try {
+                    const result = await conversationParser.processFile(filePath, projectId);
+                    if (result.newEntries > 0) {
+                        parsed += result.newEntries;
+                        logger.info('Ingested conversation entries', {
+                            file: file,
+                            project: dir.name,
+                            newEntries: result.newEntries
+                        });
+                    }
+                } catch (err) {
+                    errors++;
+                    logger.warn('Failed to parse conversation file', {
+                        file: filePath,
+                        error: err.message
+                    });
+                }
+            }
+        }
+
+        return { parsed, errors };
+    }
+
+    async _runScan() {
         if (this.isRunning) {
             logger.warn('Scan already in progress, skipping');
             return { skipped: true, reason: 'already_running' };
@@ -88,6 +154,7 @@ class SchedulerService {
 
         try {
             const result = fileScanner.scan();
+            const convoResult = await this._ingestConversations();
 
             this.lastRunChanges = result.filesWithChange.length;
             this.lastRun = new Date().toISOString();
@@ -98,7 +165,8 @@ class SchedulerService {
             return {
                 success: true,
                 duration: this.lastRunDuration,
-                changes: this.lastRunChanges
+                changes: this.lastRunChanges,
+                conversations: convoResult
             };
 
         } catch (err) {

@@ -44,7 +44,7 @@ function appendTrialRecord(record) {
  * @param {object} deps.entityStore   - Entity store (createEntityStore result)
  * @returns {object} Unified search API with `query()` method
  */
-export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, trialLog = appendTrialRecord }) {
+export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, curatedSearch, trialLog = appendTrialRecord }) {
     const config = getConfig();
     const weights = config.weights;
 
@@ -61,13 +61,14 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
     async function query(queryText, options = {}) {
         const {
             limit = config.defaultLimit,
-            signals = ['bm25', 'semantic', 'entity'],
+            signals = ['bm25', 'semantic', 'entity', 'curated'],
             scope = 'all',
         } = options;
 
         const enableBM25 = signals.includes('bm25');
         const enableSemantic = signals.includes('semantic');
         const enableEntity = signals.includes('entity');
+        const enableCurated = signals.includes('curated') && !!curatedSearch;
 
         const timings = {};
         const degraded = [];
@@ -102,6 +103,19 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
             fanOutPromises.push(Promise.resolve([]));
         }
 
+        if (enableCurated) {
+            fanOutPromises.push(
+                fanOutCurated(queryText, timings)
+                    .catch(err => {
+                        logger.warn('Curated backend failed', { error: err.message });
+                        degraded.push('curated');
+                        return [];
+                    })
+            );
+        } else {
+            fanOutPromises.push(Promise.resolve([]));
+        }
+
         let entityMatches = [];
         if (enableEntity) {
             const entityStart = Date.now();
@@ -115,13 +129,18 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
             }
         }
 
-        const [bm25Candidates, semanticCandidates] = await Promise.all(fanOutPromises);
+        const [bm25Candidates, semanticCandidates, curatedCandidates] = await Promise.all(fanOutPromises);
 
         // ── 2. Normalize BM25 scores ───────────────────────────────
         // Sigmoid normalization is monotonic, so it does not change BM25's own
         // ordering — it exists so the reported signal is a readable 0-1 value.
+        // Curated uses the same keyword scoring scheme, so it gets the same
+        // readable normalization; fusion below is by rank either way.
 
         for (const candidate of bm25Candidates) {
+            candidate.rawScore = normalizeBM25(candidate.rawScore);
+        }
+        for (const candidate of curatedCandidates) {
             candidate.rawScore = normalizeBM25(candidate.rawScore);
         }
 
@@ -145,8 +164,18 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
             ? (content) => computeBestEntityBoost(content, entityMatches)
             : undefined;
 
+        // The curated list joins fusion as a peer retriever. Authority order
+        // (Federated Memory Search, co-ceyz3): curated tiers (OKF bundles,
+        // auto-memory) outrank episodic recall (transcripts, mempalace) AT
+        // COMPARABLE RELEVANCE — meaning curated wins rank ties, it does not
+        // displace strictly better-ranked episodic hits. In RRF terms that is
+        // a weight of 0.405 vs 0.4: at adjacent top ranks the episodic hit
+        // still wins, at equal ranks curated wins. A weight of 0.6 was tried
+        // first and let ALL fetched curated candidates outrank the #1
+        // transcript hit — a monopoly, not an authority order.
+
         const fused = fuseRankedLists({
-            lists: { bm25: bm25Candidates, semantic: semanticCandidates },
+            lists: { bm25: bm25Candidates, semantic: semanticCandidates, curated: curatedCandidates },
             weights,
             entityBoostFor,
             entityWeight: weights.entity ?? 0,
@@ -186,6 +215,7 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
                 candidates: {
                     bm25: bm25Candidates.length,
                     semantic: semanticCandidates.length,
+                    curated: curatedCandidates.length,
                 },
                 returned: results.length,
                 both,
@@ -199,6 +229,7 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
             query: queryText,
             bm25Count: bm25Candidates.length,
             semanticCount: semanticCandidates.length,
+            curatedCount: curatedCandidates.length,
             entityCount: entityMatches.length,
             fusedCount: results.length,
             degraded,
@@ -255,6 +286,28 @@ export function createUnifiedSearch({ cassSearch, mempalaceSearch, entityStore, 
             }));
         } catch (err) {
             timings.semantic = Date.now() - start;
+            throw err;
+        }
+    }
+
+    /**
+     * Fan out to the curated backend (OKF bundles + auto-memory files).
+     * @param {string} queryText
+     * @param {object} timings - Mutated with curated timing
+     * @returns {Promise<Array>} Candidate objects with content, rawScore, source
+     */
+    async function fanOutCurated(queryText, timings) {
+        const start = Date.now();
+        try {
+            const result = await curatedSearch.search(queryText, { limit: 20 });
+            timings.curated = Date.now() - start;
+            return (result.hits || []).map(hit => ({
+                content: hit.snippet || hit.content || '',
+                rawScore: hit.score || 0,
+                source: { type: hit.tier || 'curated', path: hit.source_path || '', project: hit.project || null },
+            }));
+        } catch (err) {
+            timings.curated = Date.now() - start;
             throw err;
         }
     }
